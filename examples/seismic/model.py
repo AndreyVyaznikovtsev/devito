@@ -269,7 +269,7 @@ class SeismicModel(GenericModel):
         S-wave attenuation.
     """
     _known_parameters = ['vp', 'damp', 'vs', 'b', 'epsilon', 'delta',
-                         'theta', 'phi', 'qp', 'qs', 'lam', 'mu']
+                         'theta', 'phi', 'qp', 'qs', 'lam', 'mu', 'kx', 'ky', 'kz']
 
     def __init__(self, origin, spacing, shape, space_order, vp, nbl=20, fs=False,
                  dtype=np.float32, subdomains=(), bcs="mask", grid=None,
@@ -279,6 +279,7 @@ class SeismicModel(GenericModel):
 
         # Initialize physics
         self._initialize_physics(vp, space_order, **kwargs)
+        self._initialize_wavenumbers()
 
         # User provided dt
         self._dt = kwargs.get('dt')
@@ -287,6 +288,30 @@ class SeismicModel(GenericModel):
         # isoacoustic OT2. This property should be set from a wavesolver or after model
         # instanciation only via model.dt_scale = value.
         self._dt_scale = 1
+        
+    def _initialize_wavenumbers(self):
+        """
+        Initialize wavenumber grids kx and kz for frequency-domain operations.
+        """
+        if self.dim == 2:
+            # 2D case
+            kx = np.fft.fftfreq(self.shape[0], d=self.spacing[0])
+            kz = np.fft.fftfreq(self.shape[1], d=self.spacing[1])
+            kx_grid, kz_grid = np.meshgrid(kx, kz, indexing='ij')
+        else:
+            # 3D case (though we might not need kz for 3D)
+            kx = np.fft.fftfreq(self.shape[0], d=self.spacing[0])
+            ky = np.fft.fftfreq(self.shape[1], d=self.spacing[1])
+            kz = np.fft.fftfreq(self.shape[2], d=self.spacing[2])
+            kx_grid, ky_grid, kz_grid = np.meshgrid(kx, ky, kz, indexing='ij')
+        
+        # Store as Devito Functions
+        self.kx = self._gen_phys_param(kx_grid, 'kx', self.space_order, is_param=True)
+        self.kz = self._gen_phys_param(kz_grid, 'kz', self.space_order, is_param=True)
+        
+        # For 3D, we might want ky as well
+        if self.dim == 3:
+            self.ky = self._gen_phys_param(ky_grid, 'ky', self.space_order, is_param=True)
 
     def _initialize_physics(self, vp, space_order, **kwargs):
         """
