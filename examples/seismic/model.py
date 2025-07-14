@@ -402,11 +402,11 @@ class SeismicModel(GenericModel):
         if len(self.spacing) == 2:
             dx, dz = self.spacing
 
-        Skm = -2*np.max(eps - delta)*(1/dx**2)*(1/dz**2)/((1+2*np.max(eps))*(1/dx**4)+1/dz**4+2*(1+np.max(delta))*(1/dx**2)*(1/dz**2))
+        Skm = -2*np.max(eps - delta)*(1/dx**2)*(1/dz**2)/((1+2*np.min(eps))*(1/dx**4)+1/dz**4+2*(1+np.min(delta))*(1/dx**2)*(1/dz**2))
 
         numerator = np.sqrt(2)/np.sqrt(np.max([self.kx.data, self.kz.data])*dx**2/2)
         denominator = np.max(self.vp.data)*np.sqrt(((1+2*np.max(eps))+Skm)*1/dx**2+(1+Skm)*1/dz**2)
-        return numerator/denominator
+        return numerator/2*denominator
 
 
     def update(self, name, value):
