@@ -11,15 +11,15 @@ from examples.seismic.vti import VTIWaveSolver
 
 
 def vti_setup(shape=(50, 50), spacing=(20.0, 20.0), tn=250.0,
-              kernel='centered', space_order=4, nbl=10, preset='layers-tti',
+              kernel='centered', space_order=4, nbl=10, preset='layers-tti', vti = True,
               **kwargs):
 
     # Two layer model for true velocity
     model = demo_model(preset, shape=shape, spacing=spacing,
-                       space_order=space_order, nbl=nbl, **kwargs)
-
+                       space_order=space_order, nbl=nbl, vti=True, **kwargs)
     # Source and receiver geometries
     geometry = setup_geometry(model, tn)
+
 
     return VTIWaveSolver(model, geometry, space_order=space_order,
                                  kernel=kernel, **kwargs)
@@ -36,7 +36,7 @@ def run(shape=(50, 50), spacing=(20.0, 20.0), tn=250.0,
     save = full_run and not checkpointing
     rec, u, summary = solver.forward(save=save, autotune=autotune)
 
-    if preset in ['constant-tti', 'constant-tti-noazimuth']:
+    if preset in ['constant-vti']:
         # With new physical parameters as scalars (slightly higher from original values)
         vp = 2.
         epsilon = .35
@@ -82,18 +82,18 @@ if __name__ == "__main__":
                         help="Choice of finite-difference kernel")
     args = parser.parse_args()
 
-    if args.constant:
-        preset = 'constant-tti'
-    else:
-        preset = 'layers-tti'
+    preset = 'layers-vti'
 
     # Preset parameters
-    ndim = args.ndim
-    shape = args.shape[:args.ndim]
+    ndim = 2
+    shape = (50,50)
     spacing = tuple(ndim * [20.0])
     tn = args.tn if args.tn > 0 else (750. if ndim < 3 else 1250.)
 
-    run(shape=shape, spacing=spacing, nbl=args.nbl, tn=tn,
+    gflop, oi, timings, par = run(shape=shape, spacing=spacing, nbl=args.nbl, tn=tn,
         space_order=args.space_order, autotune=args.autotune, dtype=args.dtype,
         opt=args.opt, kernel=args.kernel, preset=preset,
         checkpointing=args.checkpointing, full_run=args.full)
+    
+    
+

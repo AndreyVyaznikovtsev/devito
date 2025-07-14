@@ -116,6 +116,21 @@ def demo_model(preset, **kwargs):
         return SeismicModel(space_order=space_order, vp=vp, origin=origin, shape=shape,
                             dtype=dtype, spacing=spacing, nbl=nbl, epsilon=epsilon,
                             delta=delta, theta=theta, phi=phi, bcs="damp", **kwargs)
+    
+    elif preset.lower() in ['constant-vti']:
+        # A constant single-layer model in a 2D or 3D domain
+        # with velocity 1.5 km/s.
+        epsilon = .3
+        delta = .2
+        theta = None
+        phi = None
+        if len(shape) > 2 and preset.lower() not in ['constant-vti-noazimuth']:
+            phi = .35
+        if density:
+            kwargs['b'] = 1
+        return SeismicModel(space_order=space_order, vp=vp, origin=origin, shape=shape,
+                            dtype=dtype, spacing=spacing, nbl=nbl, epsilon=epsilon,
+                            delta=delta, bcs="damp", **kwargs)
 
     elif preset.lower() in ['layers-isotropic']:
         # A n-layers model in a 2D or 3D domain with two different
@@ -239,6 +254,41 @@ def demo_model(preset, **kwargs):
 
         if kwargs.get('smooth', False):
             if len(shape) > 2 and preset.lower() not in ['layers-tti-noazimuth']:
+                model.smooth(('epsilon', 'delta', 'theta', 'phi'))
+            else:
+                model.smooth(('epsilon', 'delta', 'theta'))
+
+        return model
+    
+    elif preset.lower() in ['layers-vti']:
+        # A n-layers model in a 2D or 3D domain with two different
+        # velocities split across the height dimension:
+        # By default, the top part of the domain has 1.5 km/s,
+        # and the bottom part of the domain has 2.5 km/s.\
+        vp_top = kwargs.pop('vp_top', 1.5)
+        vp_bottom = kwargs.pop('vp_bottom', 3.5)
+        print(shape)
+        # Define a velocity profile in km/s
+        v = np.empty(shape, dtype=dtype)
+        v[:] = vp_top  # Top velocity (background)
+        vp_i = np.linspace(vp_top, vp_bottom, nlayers)
+        for i in range(1, nlayers):
+            v[..., i*int(shape[-1] / nlayers):] = vp_i[i]  # Bottom velocity
+
+        epsilon = .1*(v - vp_top)
+        delta = .05*(v - vp_top)
+        theta = .5*(v - vp_top)
+
+        if density:
+            kwargs['b'] = Gardners(v)
+
+        model = SeismicModel(space_order=space_order, vp=v, origin=origin, shape=shape,
+                             dtype=dtype, spacing=spacing, nbl=nbl, epsilon=epsilon,
+                             delta=delta, bcs="damp",
+                             fs=fs, **kwargs)
+
+        if kwargs.get('smooth', False):
+            if len(shape) > 2 and preset.lower() not in ['layers-vti-noazimuth']:
                 model.smooth(('epsilon', 'delta', 'theta', 'phi'))
             else:
                 model.smooth(('epsilon', 'delta', 'theta'))

@@ -10,7 +10,7 @@ def second_order_stencil_vti(model, p, H, q, forward=True):
 
     # Stencils
     stencil = solve(m * p.dt2 - H - q + damp * pdt, pnext)
-    print("New stencil: ", stencil)
+    # print("New stencil: ", stencil)
     eq = Eq(pnext, stencil, subdomain=model.grid.subdomains['physdomain'])
     stencils = [eq]
     
@@ -37,7 +37,7 @@ def vti_kernel_centered(model, p, **kwargs):
     
     # Spatial derivatives
     nabla_x = p.dx2
-    nabla_z = p.dz2
+    nabla_z = p.dy2
     
     kx = model.kx
     kz = model.kz
