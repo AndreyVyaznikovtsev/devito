@@ -12,6 +12,64 @@ except:
     cm = None
 
 
+def plot_three_wavelets(time_axis, wavelet1, wavelet2, wavelet3, 
+                        labels=["Initial STF", "True STF", "Deconvolved STF"],
+                        title="Source Time Function Comparison",
+                        normalize=True, noise=0.0):
+    """
+    Plot three wavelets on the same axes for comparison.
+    
+    Parameters:
+        time_axis (np.ndarray): Time axis (e.g., `np.linspace(0, 1, nt)`).
+        wavelet1 (np.ndarray): First wavelet (e.g., true STF).
+        wavelet2 (np.ndarray): Second wavelet (e.g., initial guess).
+        wavelet3 (np.ndarray): Third wavelet (e.g., Wiener-deconvolved STF).
+        labels (list): Labels for each wavelet (length 3).
+        title (str): Plot title.
+        normalize (bool): If True, normalizes all wavelets to peak amplitude.
+    """
+    if normalize:
+        wavelet1 = wavelet1 / np.max(np.abs(wavelet1))
+        wavelet2 = wavelet2 / np.max(np.abs(wavelet2))
+        wavelet3 = wavelet3 / np.max(np.abs(wavelet3))
+
+    fig = plt.figure(figsize=(10, 5))
+    plt.plot(time_axis, wavelet1, 'k-', linewidth=2, label=labels[0])
+    plt.plot(time_axis, wavelet2, 'r-', linewidth=1.5, label=labels[1])
+    plt.plot(time_axis, wavelet3, 'b:', linewidth=1.5, label=labels[2])
+    
+    plt.xlabel("Time (s)")
+    plt.ylabel("Amplitude (normalized)" if normalize else "Amplitude")
+    plt.title(f"{title}, N = {noise*100:.0f} %")
+    plt.legend()
+    plt.xlim([0, time_axis[len(time_axis)//3]])
+    plt.ylim([-1, 1])
+    plt.grid(True, linestyle=':')
+    # plt.show()
+    return fig, plt.gca()
+
+def plot_seis_double_hor(seis1, seis2, time_range, z, titles, show=False):
+    t = np.linspace(time_range[0], time_range[-1], seis1.shape[0])
+    z = np.linspace(z[-1], z[0], seis1.shape[1])
+    zz, tt = np.meshgrid(z, t)
+    fig, axs = plt.subplots(1, 2, figsize=(6.375*2, 4), sharey=True, dpi=300)
+    vm = np.quantile(seis1, 0.99)
+    axs[0].pcolormesh(zz, tt, seis1, vmin=-vm, vmax=vm, cmap="gray")
+    axs[1].pcolormesh(zz, tt, seis2, vmin=-vm, vmax=vm, cmap="gray")
+
+    axs[0].invert_yaxis()
+    axs[0].set_ylabel("Время, мс", fontsize=16)
+    for i, ax in enumerate(axs):
+        ax.set_title(titles[i], fontsize=16)
+        ax.set_xlabel("Глубина ПП, м", fontsize=16)
+
+    fig.tight_layout()
+
+    if show:
+        plt.show()
+    else:
+        return fig, axs
+
 def plot_perturbation(model, model1, colorbar=True):
     """
     Plot a two-dimensional velocity perturbation from two seismic `Model`

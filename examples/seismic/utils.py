@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from argparse import Action, ArgumentError, ArgumentParser
 
 from devito import error, configuration, warning
@@ -8,6 +9,84 @@ from devito.types.sparse import _default_radius
 from .source import *
 
 __all__ = ['AcquisitionGeometry', 'setup_geometry', 'seismic_args']
+
+import numpy as np
+from scipy.fft import fft, ifft
+
+def wiener_deconvolution(obs, modeled, eps=1e-6):
+    """
+    Wiener deconvolution to estimate the source time function (STF).
+    
+    Parameters:
+        obs (np.ndarray): Observed seismograms (shape: [time_samples, traces]).
+        modeled (np.ndarray): Synthetic seismograms (shape: [time_samples, traces]).
+        eps (float): Stabilization constant (default: 1e-6).
+    
+    Returns:
+        np.ndarray: Estimated STF (shape: [time_samples]).
+    """
+    nt, ntr = obs.shape
+    nfft = 2 ** int(np.ceil(np.log2(nt)))  # Next power of 2 for FFT
+    nfft = nt  # Next power of 2 for FFT
+
+
+    # Initialize numerator and denominator
+    sumn = np.zeros(nfft, dtype=complex)
+    sumd = np.zeros(nfft, dtype=complex)
+
+    # Compute FFT of each trace and accumulate sums
+    for i in range(ntr):
+        D_obs = fft(obs[:, i])
+        D_mod = fft(modeled[:, i])
+        
+        sumn += D_obs * np.conj(D_mod)  # Cross-correlation
+        sumd += D_mod * np.conj(D_mod)  # Auto-correlation
+
+    # Stabilization term (Ebar = average energy)
+    Ebar = np.mean(np.abs(sumd))
+
+    # Wiener filter in frequency domain
+    H = sumn / (sumd + eps * ntr * Ebar)
+
+    # Inverse FFT to get STF (truncate to original length)
+    stf = np.real(ifft(H))[:nt]
+
+    return stf
+
+def load_velocity(path, pad_x):
+    # Read CSV file into DataFrame
+    df = pd.read_csv(path, sep=r'\s+')
+    # Convert DataFrame to numpy array
+    df_array = df.to_numpy()
+    
+    # Process x and z coordinates
+    x = np.unique(df_array[:, 0])
+    x = x - np.min(x)
+    z = np.unique(df_array[:, 1])
+    
+    # Calculate grid spacing
+    dx = x[1] - x[0]
+    dz = z[1] - z[0]
+    
+    # Get grid dimensions
+    nx = len(x)
+    nz = len(z)
+    
+    # Reshape velocity and vxvz arrays
+    vel = df_array[:, 2].reshape(nz, nx)
+    vxvz = df_array[:, 3].reshape(nz, nx)
+    
+    # Extend x coordinates with padding
+    x = np.arange(-pad_x*dx, pad_x*dx + x[-1] + dx, dx)
+    z = np.arange(z[0], z[-1] + dz, dz)
+    
+    # Pad the arrays
+    vel_padded = np.pad(vel * 1000, ((0, 0), (pad_x, pad_x)), mode='edge')
+    vxvz_padded = np.pad(vxvz, ((0, 0), (pad_x, pad_x)), mode='edge')
+    
+    
+    return vel_padded, vxvz_padded, nz, nx, z, x, dz, dx
+
 
 
 def setup_geometry(model, tn, f0=0.010, interpolation='linear', **kwargs):
@@ -96,6 +175,7 @@ class AcquisitionGeometry(Pickable):
         # Initialize to empty, created at new src/rec
         self._src_coordinates = None
         self._rec_coordinates = None
+        self.wav_data = kwargs.get('wav_data', None)
 
     def resample(self, dt):
         self._dt = dt
@@ -197,7 +277,7 @@ class AcquisitionGeometry(Pickable):
             src = PointSource(name=name, grid=self.grid,
                               time_range=self.time_axis, npoint=self.nsrc,
                               coordinates=coords,
-                              interpolation=self.interpolation, r=self._r)
+                              interpolation=self.interpolation, r=self._r, data=self.wav_data.reshape(-1, 1))
         else:
             src = sources[self.src_type](name=name, grid=self.grid, f0=self.f0,
                                          time_range=self.time_axis, npoint=self.nsrc,

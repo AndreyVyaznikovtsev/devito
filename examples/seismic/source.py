@@ -122,12 +122,11 @@ class PointSource(SparseTimeFunction):
     def __init_finalize__(self, *args, **kwargs):
         time_range = kwargs.pop('time_range')
         data = kwargs.pop('data', None)
-
         kwargs.setdefault('time_order', 2)
         super().__init_finalize__(*args, **kwargs)
 
         self._time_range = time_range._rebuild()
-
+        # print("Data provided: ", data)
         # If provided, copy initial data into the allocated buffer
         if data is not None:
             self.data[:] = data
