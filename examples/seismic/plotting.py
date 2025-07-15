@@ -179,7 +179,7 @@ def plot_shotrecord(rec, model, t0, tn, colorbar=True):
     extent = [model.origin[0], model.origin[0] + 1e-3*model.domain_size[0],
               1e-3*tn, t0]
 
-    plot = plt.imshow(rec, vmin=-scale, vmax=scale, cmap=cm.gray, extent=extent)
+    plot = plt.imshow(rec, vmin=-scale, vmax=scale, cmap=cm.gray, extent=extent, aspect='auto')
     plt.xlabel('X position (km)')
     plt.ylabel('Time (s)')
 

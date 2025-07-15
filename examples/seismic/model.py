@@ -269,7 +269,7 @@ class SeismicModel(GenericModel):
         S-wave attenuation.
     """
     _known_parameters = ['vp', 'damp', 'vs', 'b', 'epsilon', 'delta',
-                         'theta', 'phi', 'qp', 'qs', 'lam', 'mu', 'kx', 'ky', 'kz']
+                         'theta', 'phi', 'qp', 'qs', 'lam', 'mu', 'kx', 'kz']
 
     def __init__(self, origin, spacing, shape, space_order, vp, nbl=20, fs=False,
                  dtype=np.float32, subdomains=(), bcs="mask", grid=None,
@@ -283,6 +283,7 @@ class SeismicModel(GenericModel):
 
         # User provided dt
         self._dt = kwargs.get('dt')
+        self._vti = kwargs.get('vti', False) #True or false only
         # Some wave equation need a rescaled dt that can't be infered from the model
         # parameters, such as isoacoustic OT4 that can use a dt sqrt(3) larger than
         # isoacoustic OT2. This property should be set from a wavesolver or after model
@@ -385,9 +386,24 @@ class SeismicModel(GenericModel):
         # dt <= coeff * h / (max(velocity))
         dt = self._cfl_coeff * np.min(self.spacing) / (self._thomsen_scale*self._max_vp)
         dt = self.dtype("%.3e" % (self.dt_scale * dt))
-        if self._dt:
+        if self._dt and not self._vti:
             return self._dt
+        elif self._vti:
+            return self._compute_stable_dt()
         return dt
+    
+    def _compute_stable_dt(self):
+        eps = self.epsilon.data
+        delta = self.delta.data
+        if len(self.spacing) == 2:
+            dx, dz = self.spacing
+
+        Skm = -2*np.max(eps - delta)*(1/dx**2)*(1/dz**2)/((1+2*np.min(eps))*(1/dx**4)+1/dz**4+2*(1+np.min(delta))*(1/dx**2)*(1/dz**2))
+
+        numerator = np.sqrt(2)/np.sqrt(np.max([self.kx.data, self.kz.data])*dx**2/2)
+        denominator = np.max(self.vp.data)*np.sqrt(((1+2*np.max(eps))+Skm)*1/dx**2+(1+Skm)*1/dz**2)
+        return numerator/2*denominator
+
 
     def update(self, name, value):
         """

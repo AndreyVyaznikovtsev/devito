@@ -5,21 +5,22 @@ except ImportError:
     pass
 
 from devito import Function, smooth, norm, info, Constant
-
+from examples.seismic.plotting import plot_shotrecord
 from examples.seismic import demo_model, setup_geometry, seismic_args
 from examples.seismic.vti import VTIWaveSolver
+import matplotlib.pyplot as plt
 
 
 def vti_setup(shape=(50, 50), spacing=(20.0, 20.0), tn=250.0,
-              kernel='centered', space_order=4, nbl=10, preset='layers-tti',
+              kernel='centered', space_order=4, nbl=10, preset='layers-tti', vti = True,
               **kwargs):
 
     # Two layer model for true velocity
     model = demo_model(preset, shape=shape, spacing=spacing,
-                       space_order=space_order, nbl=nbl, **kwargs)
-
+                       space_order=space_order, nbl=nbl, vti=vti, **kwargs)
     # Source and receiver geometries
-    geometry = setup_geometry(model, tn)
+    geometry = setup_geometry(model, tn, f0=0.100)
+
 
     return VTIWaveSolver(model, geometry, space_order=space_order,
                                  kernel=kernel, **kwargs)
@@ -36,7 +37,7 @@ def run(shape=(50, 50), spacing=(20.0, 20.0), tn=250.0,
     save = full_run and not checkpointing
     rec, u, summary = solver.forward(save=save, autotune=autotune)
 
-    if preset in ['constant-tti', 'constant-tti-noazimuth']:
+    if preset in ['constant-vti']:
         # With new physical parameters as scalars (slightly higher from original values)
         vp = 2.
         epsilon = .35
@@ -48,7 +49,7 @@ def run(shape=(50, 50), spacing=(20.0, 20.0), tn=250.0,
         solver.forward(save=save, **d)
 
     if not full_run:
-        return summary.gflopss, summary.oi, summary.timings, [rec, u]
+        return summary.gflopss, summary.oi, summary.timings, solver.model, [rec, u]
 
     # Smooth velocity
     initial_vp = Function(name='v0', grid=solver.model.grid, space_order=space_order)
@@ -82,18 +83,26 @@ if __name__ == "__main__":
                         help="Choice of finite-difference kernel")
     args = parser.parse_args()
 
-    if args.constant:
-        preset = 'constant-tti'
-    else:
-        preset = 'layers-tti'
+    preset = 'layers-vti'
 
     # Preset parameters
-    ndim = args.ndim
-    shape = args.shape[:args.ndim]
-    spacing = tuple(ndim * [20.0])
-    tn = args.tn if args.tn > 0 else (750. if ndim < 3 else 1250.)
+    ndim = 2
+    shape = (300,300)
+    spacing = tuple(ndim * [5.0])
+    tn = args.tn if args.tn > 0 else (200. if ndim < 3 else 1250.)
 
-    run(shape=shape, spacing=spacing, nbl=args.nbl, tn=tn,
+    gflop, oi, timings, model, par = run(shape=shape, spacing=spacing, nbl=args.nbl, tn=tn,
         space_order=args.space_order, autotune=args.autotune, dtype=args.dtype,
         opt=args.opt, kernel=args.kernel, preset=preset,
-        checkpointing=args.checkpointing, full_run=args.full)
+        checkpointing=args.checkpointing, full_run=args.full, vti=True)
+    print('critial: ', model.critical_dt)
+
+    # gflop, oi, timings, model, par = run(shape=shape, spacing=spacing, nbl=args.nbl, tn=tn,
+    #     space_order=args.space_order, autotune=args.autotune, dtype=args.dtype,
+    #     opt=args.opt, kernel=args.kernel, preset=preset,
+    #     checkpointing=args.checkpointing, full_run=args.full, vti=True)
+    # print('computed: ', model.critical_dt)
+    
+    plot_shotrecord(par[1].data[0], model, 0, tn)
+    
+
