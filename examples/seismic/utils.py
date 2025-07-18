@@ -13,7 +13,7 @@ __all__ = ['AcquisitionGeometry', 'setup_geometry', 'seismic_args']
 import numpy as np
 from scipy.fft import fft, ifft
 
-def wiener_deconvolution(obs, modeled, eps=1e-6):
+def wiener_deconvolution(obs, modeled, eps=1e-3):
     """
     Wiener deconvolution to estimate the source time function (STF).
     
@@ -94,7 +94,7 @@ def setup_geometry(model, tn, f0=0.010, interpolation='linear', **kwargs):
     src_coordinates = np.empty((1, model.dim))
     if model.dim > 1:
         src_coordinates[0, :] = np.array(model.domain_size) * .5
-        src_coordinates[0, -1] = model.origin[-1] + model.spacing[-1]
+        # src_coordinates[0, -1] = model.origin[-1] + model.spacing[-1]
     else:
         src_coordinates[0, 0] = 2 * model.spacing[0]
 

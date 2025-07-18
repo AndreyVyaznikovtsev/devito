@@ -160,7 +160,7 @@ def plot_velocity(model, source=None, receiver=None, colorbar=True, cmap="jet"):
     plt.show()
 
 
-def plot_shotrecord(rec, model, t0, tn, colorbar=True):
+def plot_shotrecord(rec, t0, tn, colorbar=True):
     """
     Plot a shot record (receiver values over time).
 
@@ -175,13 +175,18 @@ def plot_shotrecord(rec, model, t0, tn, colorbar=True):
     tn : int
         End of time dimension to plot.
     """
-    scale = np.max(rec) / 10.
-    extent = [model.origin[0], model.origin[0] + 1e-3*model.domain_size[0],
-              1e-3*tn, t0]
-
-    plot = plt.imshow(rec, vmin=-scale, vmax=scale, cmap=cm.gray, extent=extent, aspect='auto')
+    scale = np.max(rec) / 5.
+    # extent = [model.origin[0], model.origin[0] + 1e-3*model.domain_size[0],
+    #           model.origin[1] + 1e-3*model.domain_size[1], model.origin[1]]
+    print(rec.shape)
+    plot = plt.imshow(rec.T, vmin=-scale, vmax=scale, cmap=cm.gray, aspect='equal')
     plt.xlabel('X position (km)')
-    plt.ylabel('Time (s)')
+    plt.ylabel('Y position (km)')
+    major_ticks = np.arange(0, rec.shape[0], 50)
+    ax = plt.gca()
+    ax.set_xticks(major_ticks)
+    ax.set_yticks(major_ticks)
+    plt.grid()
 
     # Create aligned colorbar on the right
     if colorbar:

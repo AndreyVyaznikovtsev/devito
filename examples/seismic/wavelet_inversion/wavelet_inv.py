@@ -6,8 +6,9 @@ import pickle
 import numpy as np
 from matplotlib import pyplot as plt
 from examples.seismic.utils import load_velocity, wiener_deconvolution
-from examples.seismic import Model, AcquisitionGeometry, TimeAxis
+from examples.seismic import SeismicModel, AcquisitionGeometry, TimeAxis
 from examples.seismic.acoustic import AcousticWaveSolver
+from examples.seismic.vti import VTIWaveSolver
 from examples.seismic.plotting import plot_seis_double_hor, plot_three_wavelets
 from devito import configuration, TimeFunction, Function, gaussian_smooth
 from scipy import ndimage
@@ -39,40 +40,45 @@ def create_gif(image_folder, output_path, duration=500):
 
 def main():
     pad_x = 5
-    vp, vsvz, nz, nx, z, x, dz, dx = load_velocity(path='88_99_EXTENDED.txt', pad_x=pad_x)
-    so = 2
+    vp, vxvz, nz, nx, z, x, dz, dx = load_velocity(path='88_99_EXTENDED.txt', pad_x=pad_x)
+    so = 4
     spacing = (dx, dz)
     vp = vp.T
+    vxvz = vxvz.T
+    epsilon = vxvz - 1
+    epsilon[epsilon < 0] = 0.
+    delta = np.zeros_like(epsilon)
+    vp = (2*vp)/(2+epsilon)
+    print(epsilon.min(), epsilon.max())
+    print(vp.min(), vp.max())
     print(dx)
     nbl = 50
     print(vp.shape)
-    model = Model(vp=vp/1000,
+    model = SeismicModel(vp=vp/1000,
                   origin=(x.min(), z.min()),
                   shape=vp.shape,
                   spacing=spacing,
                   space_order=so,
+                  epsilon=epsilon,
+                  delta=delta,
                   nbl=nbl,
-                  bcs="damp")
+                  bcs="damp",
+                  vti=True)
     t0 = 0.0
     tn = 150.0
-    f0 = 0.15
+    f0 = 0.1
     indent = 0.0
     sz = -150.0
     sx = 0.
-    print(z)
     src_pos = np.array([sx, sz])[None, :]
     rec_x = np.ones_like(z)*(x[-1]-pad_x*dx)
     rec_z = np.copy(z)
     rec_pos = np.vstack([rec_x, rec_z]).T
-    
-    print("Origin: ", model.origin)
-    print("Src Pos: ", src_pos)
-    print("Rec Pos: ", rec_pos[:10])
-    Ns = [0.05*i for i in range(61)] 
+    Ns = [0.05*i for i in range(21)] 
     for N in Ns:
         geometry = AcquisitionGeometry( 
             model, rec_pos, src_pos, t0, tn, f0=f0, src_type='Ricker')
-        solver = AcousticWaveSolver(model, geometry, space_order=so)
+        solver = VTIWaveSolver(model, geometry, space_order=so)
         d_1, _, _ = solver.forward(vp=model.vp)
         wav1 = geometry.src.data
         geometry = AcquisitionGeometry( 
@@ -84,34 +90,34 @@ def main():
         stf = wiener_deconvolution(d_2.data+np.random.normal(scale=std_n, size=d_2.data.shape), d_1.data)
         wav2 = geometry.src.data
         wav3 = np.convolve(wav1.squeeze(), stf)[:d_1.shape[0]]
-        fig, axs = plot_three_wavelets(geometry.time_axis.time_values, wav1, wav2, wav3, noise=N)
-        plt.savefig(f"wavelet_frames/Inverted Wavelet {N:.2f}" + ".png", dpi=300,
-                    bbox_inches="tight", pad_inches=0.1)
-        plt.close()
-
-        # titles = ("(а)", "(б)")
-        # fig, axs = plot_seis_double_hor(np.array(d_1.data[:]),np.array(d_2.data[:]),
-        #                                 geometry.time_axis.time_values, z, titles=titles,
-        #                                 )   
-        
-        # plt.savefig("Forward" + ".png", dpi=300,
+        # fig, axs = plot_three_wavelets(geometry.time_axis.time_values, wav1, wav2, wav3, noise=N)
+        # plt.savefig(f"wavelet_frames/Inverted Wavelet {N:.2f}" + ".png", dpi=300,
         #             bbox_inches="tight", pad_inches=0.1)
         # plt.close()
 
-        geometry = AcquisitionGeometry( 
-            model, rec_pos, src_pos, t0, tn, f0=f0*2, src_type=None, wav_data=wav3)
-        d_3, _, _ = solver.forward(vp=model.vp, src=geometry.src)
-        
         titles = ("(а)", "(б)")
-        fig, axs = plot_seis_double_hor(np.array(d_2.data[:]),np.array(d_3.data[:]),
+        fig, axs = plot_seis_double_hor(np.array(d_1.data[:]),np.array(d_2.data[:]),
                                         geometry.time_axis.time_values, z, titles=titles,
                                         )   
-        plt.savefig(f"forward_frames/Forward + Inverted {N:.2f}" + ".png", dpi=300,
+        
+        plt.savefig("Forward" + ".png", dpi=300,
                     bbox_inches="tight", pad_inches=0.1)
         plt.close()
 
-    create_gif('wavelet_frames', 'wavelets.gif')
-    create_gif('forward_frames', 'forward_inverted.gif')
+        # geometry = AcquisitionGeometry( 
+        #     model, rec_pos, src_pos, t0, tn, f0=f0*2, src_type=None, wav_data=wav3)
+        # d_3, _, _ = solver.forward(vp=model.vp, src=geometry.src)
+        
+        # titles = ("(а)", "(б)")
+        # fig, axs = plot_seis_double_hor(np.array(d_2.data[:]),np.array(d_3.data[:]),
+        #                                 geometry.time_axis.time_values, z, titles=titles,
+        #                                 )   
+        # plt.savefig(f"forward_frames/Forward + Inverted {N:.2f}" + ".png", dpi=300,
+        #             bbox_inches="tight", pad_inches=0.1)
+        # plt.close()
+
+    # create_gif('wavelet_frames', 'wavelets.gif')
+    # create_gif('forward_frames', 'forward_inverted.gif')
     # image = Function(name='image', grid=model.grid)
     # v = TimeFunction(name='v', grid=model.grid, time_order=2,
     #                  space_order=4, save=geometry.nt)

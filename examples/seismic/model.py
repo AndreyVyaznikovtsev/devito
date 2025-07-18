@@ -268,9 +268,10 @@ class SeismicModel(GenericModel):
     qs : array_like or float
         S-wave attenuation.
     """
+    # _known_parameters = ['vp', 'damp', 'vs', 'b', 'epsilon', 'delta',
+    #                      'theta', 'phi', 'qp', 'qs', 'lam', 'mu', 'kx', 'ky']
     _known_parameters = ['vp', 'damp', 'vs', 'b', 'epsilon', 'delta',
-                         'theta', 'phi', 'qp', 'qs', 'lam', 'mu', 'kx', 'kz']
-
+                         'theta', 'phi', 'qp', 'qs', 'lam', 'mu']
     def __init__(self, origin, spacing, shape, space_order, vp, nbl=20, fs=False,
                  dtype=np.float32, subdomains=(), bcs="mask", grid=None,
                  topology=None, **kwargs):
@@ -290,18 +291,18 @@ class SeismicModel(GenericModel):
         # instanciation only via model.dt_scale = value.
         self._dt_scale = 1
         
-    def _initialize_wavenumbers(self):
-        """
-        Initialize wavenumber grids kx and kz for frequency-domain operations.
-        """
+    # def _initialize_wavenumbers(self):
+    #     """
+    #     Initialize wavenumber grids kx and kz for frequency-domain operations.
+    #     """
 
-        kx = np.fft.fftfreq(self.shape[0], d=self.spacing[0])
-        ky = np.fft.fftfreq(self.shape[1], d=self.spacing[1])
-        kx_grid, ky_grid = np.meshgrid(kx, ky, indexing='ij')
+    #     kx = np.fft.fftfreq(self.shape[0], d=self.spacing[0])
+    #     ky = np.fft.fftfreq(self.shape[1], d=self.spacing[1])
+    #     kx_grid, ky_grid = np.meshgrid(kx, ky, indexing='ij')
 
-        # Store as Devito Functions
-        self.kx = self._gen_phys_param(kx_grid, 'kx', self.space_order, is_param=True)
-        self.ky = self._gen_phys_param(ky_grid, 'ky', self.space_order, is_param=True)
+    #     # Store as Devito Functions
+    #     self.kx = self._gen_phys_param(kx_grid, 'kx', space_order=0, is_param=True)
+    #     self.ky = self._gen_phys_param(ky_grid, 'ky', space_order=0, is_param=True)
         
         
     def _initialize_physics(self, vp, space_order, **kwargs):
@@ -348,6 +349,14 @@ class SeismicModel(GenericModel):
         # Update scale for tti
         if 'epsilon' in self._physical_parameters:
             return np.sqrt(1 + 2 * mmax(self.epsilon))
+        if self._vti:
+            eps = self.epsilon.data
+            delta = self.delta.data
+            dx = min(self.spacing)
+            Skm = -2*(eps - delta)*(1/dx**4) / ( (1+2*eps)*(1/dx**4) + 1/dx**4 + 2*(1+delta)*(1/dx**4))
+            Skm_term = np.max(Skm)
+            eps_term = np.max(eps)
+            return np.sqrt(2*(1 + eps_term + Skm_term))
         return 1
 
     @property
@@ -386,23 +395,9 @@ class SeismicModel(GenericModel):
         # dt <= coeff * h / (max(velocity))
         dt = self._cfl_coeff * np.min(self.spacing) / (self._thomsen_scale*self._max_vp)
         dt = self.dtype("%.3e" % (self.dt_scale * dt))
-        if self._dt and not self._vti:
+        if self._dt:
             return self._dt
-        elif self._vti:
-            return self._compute_stable_dt()
         return dt
-    
-    def _compute_stable_dt(self):
-        eps = self.epsilon.data
-        delta = self.delta.data
-        if len(self.spacing) == 2:
-            dx, dz = self.spacing
-
-        Skm = -2*np.max(eps - delta)*(1/dx**2)*(1/dz**2)/((1+2*np.min(eps))*(1/dx**4)+1/dz**4+2*(1+np.min(delta))*(1/dx**2)*(1/dz**2))
-
-        numerator = np.sqrt(2)/np.sqrt(np.max([self.kx.data, self.kz.data])*dx**2/2)
-        denominator = np.max(self.vp.data)*np.sqrt(((1+2*np.max(eps))+Skm)*1/dx**2+(1+Skm)*1/dz**2)
-        return numerator/2*denominator
 
 
     def update(self, name, value):

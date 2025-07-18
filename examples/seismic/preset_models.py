@@ -120,15 +120,12 @@ def demo_model(preset, **kwargs):
     elif preset.lower() in ['constant-vti']:
         # A constant single-layer model in a 2D or 3D domain
         # with velocity 1.5 km/s.
-        epsilon = .3
-        delta = .2
-        theta = None
-        phi = None
-        if len(shape) > 2 and preset.lower() not in ['constant-vti-noazimuth']:
-            phi = .35
+        v = 3.
+        epsilon = 0.1
+        delta = 0.3
         if density:
             kwargs['b'] = 1
-        return SeismicModel(space_order=space_order, vp=vp, origin=origin, shape=shape,
+        return SeismicModel(space_order=space_order, vp=v, origin=origin, shape=shape,
                             dtype=dtype, spacing=spacing, nbl=nbl, epsilon=epsilon,
                             delta=delta, bcs="damp", **kwargs)
 
@@ -227,7 +224,7 @@ def demo_model(preset, **kwargs):
         # velocities split across the height dimension:
         # By default, the top part of the domain has 1.5 km/s,
         # and the bottom part of the domain has 2.5 km/s.\
-        vp_top = kwargs.pop('vp_top', 1.5)
+        vp_top = kwargs.pop('vp_top', 3.5)
         vp_bottom = kwargs.pop('vp_bottom', 3.5)
 
         # Define a velocity profile in km/s
@@ -265,7 +262,7 @@ def demo_model(preset, **kwargs):
         # velocities split across the height dimension:
         # By default, the top part of the domain has 1.5 km/s,
         # and the bottom part of the domain has 2.5 km/s.\
-        vp_top = kwargs.pop('vp_top', 1.5)
+        vp_top = kwargs.pop('vp_top', 2.5)
         vp_bottom = kwargs.pop('vp_bottom', 3.5)
         print(shape)
         # Define a velocity profile in km/s
@@ -275,9 +272,8 @@ def demo_model(preset, **kwargs):
         for i in range(1, nlayers):
             v[..., i*int(shape[-1] / nlayers):] = vp_i[i]  # Bottom velocity
 
-        epsilon = .1*(v - vp_top)
-        delta = .05*(v - vp_top)
-        theta = .5*(v - vp_top)
+        epsilon = .0
+        delta = .0
 
         if density:
             kwargs['b'] = Gardners(v)
@@ -288,10 +284,7 @@ def demo_model(preset, **kwargs):
                              fs=fs, **kwargs)
 
         if kwargs.get('smooth', False):
-            if len(shape) > 2 and preset.lower() not in ['layers-vti-noazimuth']:
-                model.smooth(('epsilon', 'delta', 'theta', 'phi'))
-            else:
-                model.smooth(('epsilon', 'delta', 'theta'))
+            model.smooth(('epsilon', 'delta'))
 
         return model
 

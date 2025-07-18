@@ -11,15 +11,14 @@ from examples.seismic.vti import VTIWaveSolver
 import matplotlib.pyplot as plt
 
 
-def vti_setup(shape=(50, 50), spacing=(20.0, 20.0), tn=250.0,
-              kernel='centered', space_order=4, nbl=10, preset='layers-tti', vti = True,
+def vti_setup(shape=(301, 301), spacing=(10.0, 10.0), tn=250.0,
+              kernel='centered', space_order=4, nbl=50, preset='layers-tti', vti = True,
               **kwargs):
-
     # Two layer model for true velocity
     model = demo_model(preset, shape=shape, spacing=spacing,
                        space_order=space_order, nbl=nbl, vti=vti, **kwargs)
     # Source and receiver geometries
-    geometry = setup_geometry(model, tn, f0=0.100)
+    geometry = setup_geometry(model, tn, f0=0.02)
 
 
     return VTIWaveSolver(model, geometry, space_order=space_order,
@@ -27,7 +26,7 @@ def vti_setup(shape=(50, 50), spacing=(20.0, 20.0), tn=250.0,
 
 
 def run(shape=(50, 50), spacing=(20.0, 20.0), tn=250.0,
-        autotune=False, space_order=4, nbl=10, preset='layers-tti',
+        autotune=False, space_order=4, nbl=0, preset='layers-tti',
         kernel='centered', full_run=False, checkpointing=False, **kwargs):
 
     solver = vti_setup(shape=shape, spacing=spacing, tn=tn, space_order=space_order,
@@ -35,33 +34,22 @@ def run(shape=(50, 50), spacing=(20.0, 20.0), tn=250.0,
 
     info("Applying Forward")
     save = full_run and not checkpointing
-    rec, u, summary = solver.forward(save=save, autotune=autotune)
+    rec, u, summary = solver.forward(save=save)
 
-    if preset in ['constant-vti']:
-        # With new physical parameters as scalars (slightly higher from original values)
-        vp = 2.
-        epsilon = .35
-        delta = .25
-        solver.forward(save=save, vp=vp, epsilon=epsilon, delta=delta)
-        # With new physical parameters as Constants
-        d = {'vp': vp, 'epsilon': epsilon, 'delta': delta}
-        d = {k: Constant(name=k, value=v, dtype=np.float32) for k, v in d.items()}
-        solver.forward(save=save, **d)
+    # if not full_run:
+    #     return summary.gflopss, summary.oi, summary.timings, solver.model, [rec, u]
 
-    if not full_run:
-        return summary.gflopss, summary.oi, summary.timings, solver.model, [rec, u]
+    # # Smooth velocity
+    # initial_vp = Function(name='v0', grid=solver.model.grid, space_order=space_order)
+    # smooth(initial_vp, solver.model.vp)
+    # dm = np.float32(initial_vp.data**(-2) - solver.model.vp.data**(-2))
 
-    # Smooth velocity
-    initial_vp = Function(name='v0', grid=solver.model.grid, space_order=space_order)
-    smooth(initial_vp, solver.model.vp)
-    dm = np.float32(initial_vp.data**(-2) - solver.model.vp.data**(-2))
-
-    info("Applying Adjoint")
-    solver.adjoint(rec, autotune=autotune)
-    info("Applying Born")
-    solver.jacobian(dm, autotune=autotune)
-    info("Applying Gradient")
-    solver.jacobian_adjoint(rec, u, autotune=autotune, checkpointing=checkpointing)
+    # info("Applying Adjoint")
+    # solver.adjoint(rec, autotune=autotune)
+    # info("Applying Born")
+    # solver.jacobian(dm, autotune=autotune)
+    # info("Applying Gradient")
+    # solver.jacobian_adjoint(rec, u, autotune=autotune, checkpointing=checkpointing)
 
     return summary.gflopss, summary.oi, summary.timings, [rec, u]
 
@@ -83,26 +71,19 @@ if __name__ == "__main__":
                         help="Choice of finite-difference kernel")
     args = parser.parse_args()
 
-    preset = 'layers-vti'
+    preset = 'constant-vti'
 
     # Preset parameters
     ndim = 2
-    shape = (300,300)
-    spacing = tuple(ndim * [5.0])
-    tn = args.tn if args.tn > 0 else (200. if ndim < 3 else 1250.)
+    shape = (301,301)
+    spacing = tuple(ndim * [10.0])
+    tn = args.tn if args.tn > 0 else (350. if ndim < 3 else 1250.)
 
-    gflop, oi, timings, model, par = run(shape=shape, spacing=spacing, nbl=args.nbl, tn=tn,
+    gflop, oi, timings, par = run(shape=shape, spacing=spacing, nbl=args.nbl, tn=tn,
         space_order=args.space_order, autotune=args.autotune, dtype=args.dtype,
         opt=args.opt, kernel=args.kernel, preset=preset,
         checkpointing=args.checkpointing, full_run=args.full, vti=True)
-    print('critial: ', model.critical_dt)
-
-    # gflop, oi, timings, model, par = run(shape=shape, spacing=spacing, nbl=args.nbl, tn=tn,
-    #     space_order=args.space_order, autotune=args.autotune, dtype=args.dtype,
-    #     opt=args.opt, kernel=args.kernel, preset=preset,
-    #     checkpointing=args.checkpointing, full_run=args.full, vti=True)
-    # print('computed: ', model.critical_dt)
     
-    plot_shotrecord(par[1].data[0], model, 0, tn)
+    plot_shotrecord(par[1].data[0], 0, tn)
     
 

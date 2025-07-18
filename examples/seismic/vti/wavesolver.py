@@ -46,6 +46,7 @@ class VTIWaveSolver:
         # Cache compiler options
         self._kwargs = kwargs
 
+
     @property
     def dt(self):
         return self.model.critical_dt
@@ -92,8 +93,10 @@ class VTIWaveSolver:
                            space_order=self.space_order)
 
         model = model or self.model
+
         # Pick vp and Thomsen parameters from model unless explicitly provided
         kwargs.update(model.physical_params(**kwargs))
+
         # Execute operator and return wavefield and receiver data
         summary = self.op_fwd(save).apply(src=src, rec=rec, p=p,
                                           dt=kwargs.pop('dt', self.dt), **kwargs)

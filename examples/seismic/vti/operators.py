@@ -9,8 +9,7 @@ def second_order_stencil_vti(model, p, H, q, forward=True):
     pdt = p.dt if forward else p.dt.T
 
     # Stencils
-    stencil = solve(m * p.dt2 - H - q + damp * pdt, pnext)
-    # print("New stencil: ", stencil)
+    stencil = solve(p.dt2 - H - q + damp * pdt, pnext)
     eq = Eq(pnext, stencil, subdomain=model.grid.subdomains['physdomain'])
     stencils = [eq]
     
@@ -34,21 +33,29 @@ def vti_kernel_centered(model, p, **kwargs):
     # Get source if provided
     q = kwargs.get('q', 0)
 
-    
-    # Spatial derivatives
+    px = p.dx
+    pz = p.dy
+    px2 = px**2
+    pz2 = pz**2
+    px4 = px**4
+    pz4 = pz**4
+
     nabla_x = p.dx2
     nabla_z = p.dy2
     
-    kx = model.kx
-    kz = model.kz
+    # kx = model.kx
+    # ky = model.ky
+
+    # numerator = -2*(epsilon-delta)*kx**2*ky**2
+    # denominator = (1+2*epsilon)*kx**4 + ky**4 + 2*(1+delta)*kx**2*ky**2
+    # sk = numerator / (denominator + 1e-26)  # Small constant to avoid division by zero
+    # H = vp**2 * ((1+2*epsilon + sk)*nabla_x + (1 + sk)*nabla_z) 
     
-    # Anisotropy term - all real-valued
-    numerator = -2*(epsilon-delta)*kx**2*kz**2
-    denominator = (1+2*epsilon)*kx**4 + kz**4 + 2*(1+delta)*kx**2*kz**2
-    sk = numerator / (denominator + 1e-26)  # Small constant to avoid division by zero
-    
-    H = vp**2 * (1+2*epsilon + sk)*nabla_x + (1 + sk)*nabla_z
-    
+    numerator = -2 * (epsilon - delta) * px2 * pz2
+    denominator = (1 + 2 * epsilon) * px4 + pz4 + 2 * (1 + delta) * px2 * pz2
+    sn = numerator / (denominator + 1e-26)  # Small constant to avoid division by zero
+    H = vp**2 * ((1+2*epsilon + sn)*nabla_x + (1 + sn)*nabla_z) 
+
     return second_order_stencil_vti(model, p, H, q, forward=forward)
 
 
@@ -56,6 +63,7 @@ def ForwardOperator(model, geometry, space_order=4, save=False, **kwargs):
     """
     Construct a forward modeling operator for VTI media using single-component wavefield.
     """
+
     dt = model.grid.time_dim.spacing
     time_order = 2
     
@@ -73,7 +81,7 @@ def ForwardOperator(model, geometry, space_order=4, save=False, **kwargs):
     # Source and receivers
     stencils += src.inject(field=p.forward, expr=src * dt**2 / model.m)
     stencils += rec.interpolate(expr=p)
-    
+
     return Operator(stencils, subs=model.spacing_map, name='ForwardVTI', **kwargs)
 
 
