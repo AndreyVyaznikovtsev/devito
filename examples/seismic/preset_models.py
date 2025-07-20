@@ -121,7 +121,7 @@ def demo_model(preset, **kwargs):
         # A constant single-layer model in a 2D or 3D domain
         # with velocity 1.5 km/s.
         v = 3.
-        epsilon = 0.1
+        epsilon = 0.3
         delta = 0.3
         if density:
             kwargs['b'] = 1

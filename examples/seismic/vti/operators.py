@@ -40,8 +40,8 @@ def vti_kernel_centered(model, p, **kwargs):
     px4 = px**4
     pz4 = pz**4
 
-    nabla_x = p.dx2
-    nabla_z = p.dy2
+    dxx = p.dx2
+    dzz = p.dy2
     
     # kx = model.kx
     # ky = model.ky
@@ -54,7 +54,7 @@ def vti_kernel_centered(model, p, **kwargs):
     numerator = -2 * (epsilon - delta) * px2 * pz2
     denominator = (1 + 2 * epsilon) * px4 + pz4 + 2 * (1 + delta) * px2 * pz2
     sn = numerator / (denominator + 1e-26)  # Small constant to avoid division by zero
-    H = vp**2 * ((1+2*epsilon + sn)*nabla_x + (1 + sn)*nabla_z) 
+    H = vp**2 * ((1+2*epsilon + sn)*dxx + (1 + sn)*dzz) 
 
     return second_order_stencil_vti(model, p, H, q, forward=forward)
 

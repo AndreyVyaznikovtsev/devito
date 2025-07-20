@@ -13,3 +13,4 @@ docs/_build
 devito.egg-info/*
 *.png
 *.gif
+*.sgy
