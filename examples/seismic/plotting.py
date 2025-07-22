@@ -1,16 +1,115 @@
 import numpy as np
+from typing import Sequence
 try:
     import matplotlib as mpl
     import matplotlib.pyplot as plt
     from matplotlib import cm
     from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-    mpl.rc('font', size=16)
+    mpl.rc('font', size=10)
     mpl.rc('figure', figsize=(8, 6))
 except:
     plt = None
     cm = None
 
+def plot_two_wavelets(time_axis, wavelet1, wavelet2, taper,
+                        labels=["Initial STF", "Deconvolved STF", "Taper"],
+                        title="Source Time Function Comparison",
+                        normalize=True):
+    """
+    Plot three wavelets on the same axes for comparison.
+    
+    Parameters:
+        time_axis (np.ndarray): Time axis (e.g., `np.linspace(0, 1, nt)`).
+        wavelet1 (np.ndarray): Second wavelet (e.g., initial guess).
+        wavelet2 (np.ndarray): Third wavelet (e.g., Wiener-deconvolved STF).
+        labels (list): Labels for each wavelet (length 3).
+        title (str): Plot title.
+        normalize (bool): If True, normalizes all wavelets to peak amplitude.
+    """
+    if normalize:
+        wavelet1 = wavelet1 / np.max(np.abs(wavelet1))
+        wavelet2 = wavelet2 / np.max(np.abs(wavelet2))
+
+    fig = plt.figure(figsize=(10, 5))
+    plt.plot(time_axis, wavelet1, 'k-', linewidth=2, label=labels[0])
+    plt.plot(time_axis, wavelet2, 'r-', linewidth=1.5, label=labels[1])
+    plt.plot(time_axis, taper, 'b-', linewidth=1.5, label=labels[2])
+    
+    plt.xlabel("Time (s)")
+    plt.ylabel("Amplitude (normalized)" if normalize else "Amplitude")
+    plt.title(f"{title}")
+    plt.legend()
+    plt.xlim([0, time_axis[len(time_axis)//3]])
+    plt.ylim([-1, 1])
+    plt.grid(True, linestyle=':')
+    # plt.show()
+    return fig, plt.gca()
+
+def overlay_wiggle_plot(
+    data1: np.ndarray,
+    data2: np.ndarray,
+    xrec: Sequence[float] | None = None,
+    time_axis: Sequence[float] | None = None,
+    *,
+    t_scale: float = 1.0,
+    gain: float = 1.5,
+    title: str = "Seismic Comparison",
+    figsize: tuple = (8, 6),
+    dpi: int = 300,
+    show: bool = False,
+):
+    # Create figure and axis
+    fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+    
+    # Set time axis if not provided
+    if time_axis is None:
+        time_axis = np.arange(data1.shape[0])
+    if xrec is None:
+        xrec = np.arange(data1.shape[1])
+        
+    xrec = np.asarray(xrec)
+    time_axis = np.asarray(time_axis)
+    tg = time_axis ** t_scale
+    dx = np.diff(xrec, prepend=xrec[0])
+    
+    # Set axis limits
+    ax.set_ylim(time_axis.max(), time_axis.min())
+    ax.set_xlim(xrec.min(), xrec.max())
+    model_line = plt.Line2D([0], [0], color='k', linewidth=0.8, label='Модельные данные')
+    real_line = plt.Line2D([0], [0], color='r', linewidth=0.6, label='Наблюденные данные')
+
+    # Plot first dataset (black)
+    for i, xr in enumerate(xrec):
+        trace = tg * data1[:, i]
+        if np.max(np.abs(trace)) != 0:
+            trace = gain * (dx[i] * trace / np.max(np.abs(trace))) + xr
+        else:
+            trace = trace + xr
+        
+        ax.plot(trace, time_axis, 'k-', linewidth=0.8, alpha=0.9)
+        ax.fill_betweenx(time_axis, xr, trace, where=trace > xr, color='k', alpha=0.5)
+    
+    # Plot second dataset (red)
+    for i, xr in enumerate(xrec):
+        trace = tg * data2[:, i]
+        if np.max(np.abs(trace)) != 0:
+            trace = gain * (dx[i] * trace / np.max(np.abs(trace))) + xr
+        else:
+            trace = trace + xr
+        
+        ax.plot(trace, time_axis, 'r-', linewidth=0.6, alpha=0.7)
+        ax.fill_betweenx(time_axis, xr, trace, where=trace > xr, color='r', alpha=0.4)
+    ax.legend(handles=[model_line, real_line], loc='upper right', framealpha=0.9, fontsize=8)
+    # Add labels and title
+    ax.set_xlabel("Глубина, м", fontsize=12)
+    ax.set_ylabel("Время, мс", fontsize=12)
+    plt.tight_layout()
+    
+    if show:
+        plt.show()
+    else:
+        return fig, ax
 
 def plot_three_wavelets(time_axis, wavelet1, wavelet2, wavelet3, 
                         labels=["Initial STF", "True STF", "Deconvolved STF"],
@@ -49,15 +148,21 @@ def plot_three_wavelets(time_axis, wavelet1, wavelet2, wavelet3,
     return fig, plt.gca()
 
 def plot_seis_double_hor(seis1, seis2, time_range, z, titles, show=False):
-    t = np.linspace(time_range[0], time_range[-1], seis1.shape[0])
-    z = np.linspace(z[-1], z[0], seis1.shape[1])
-    zz, tt = np.meshgrid(z, t)
     fig, axs = plt.subplots(1, 2, figsize=(6.375*2, 4), sharey=True, dpi=300)
-    vm = np.quantile(seis1, 0.99)
-    axs[0].pcolormesh(zz, tt, seis1, vmin=-vm, vmax=vm, cmap="gray")
-    axs[1].pcolormesh(zz, tt, seis2, vmin=-vm, vmax=vm, cmap="gray")
+    vm1 = np.quantile(seis1, 0.99)
+    vm2 = np.quantile(seis2, 0.99)
 
-    axs[0].invert_yaxis()
+    
+    # Calculate extent [left, right, bottom, top]
+    extent = [z[0], z[-1], time_range[-1], time_range[0]]
+    
+    # Plot using imshow
+    axs[0].imshow(seis1, aspect='auto', extent=extent, 
+                 vmin=-vm1, vmax=vm1, cmap="gray")
+    axs[1].imshow(seis2, aspect='auto', extent=extent, 
+                 vmin=-vm2, vmax=vm2, cmap="gray")
+
+    # axs[0].invert_yaxis()
     axs[0].set_ylabel("Время, мс", fontsize=16)
     for i, ax in enumerate(axs):
         ax.set_title(titles[i], fontsize=16)

@@ -1,4 +1,4 @@
-from devito import (Eq, Operator, Function, TimeFunction, Inc, solve)
+from devito import (Eq, Operator, Function, TimeFunction, Inc, solve, ConditionalDimension)
 from examples.seismic.acoustic.operators import freesurface
 
 
@@ -15,7 +15,7 @@ def second_order_stencil_vti(model, p, H, q, forward=True):
     
     # Add free surface
     if model.fs:
-        stencils.append(freesurface(model, eq))
+        stencils.append(freesurface(model, Eq(pnext, stencil)))
     return stencils
 
 
@@ -61,17 +61,17 @@ def vti_kernel_centered(model, p, **kwargs):
 
 def ForwardOperator(model, geometry, space_order=4, save=False, **kwargs):
     """
-    Construct a forward modeling operator for VTI media using single-component wavefield.
+    Construct a forward modeling operator with snapshotting capability.
     """
-
     dt = model.grid.time_dim.spacing
     time_order = 2
     
-    # Create wavefield
     p = TimeFunction(name='p', grid=model.grid,
-                     save=geometry.nt if save else None,
-                     time_order=time_order, space_order=space_order)
-    
+                    save=None,
+                    time_order=time_order, 
+                    space_order=space_order)
+
+
     src = geometry.src
     rec = geometry.rec
     
@@ -79,10 +79,22 @@ def ForwardOperator(model, geometry, space_order=4, save=False, **kwargs):
     stencils = vti_kernel_centered(model, p)
     
     # Source and receivers
+
     stencils += src.inject(field=p.forward, expr=src * dt**2 / model.m)
     stencils += rec.interpolate(expr=p)
 
-    return Operator(stencils, subs=model.spacing_map, name='ForwardVTI', **kwargs)
+    if save:
+        nsnaps = kwargs.get('nsnaps', 5)
+        factor = round(geometry.nt / nsnaps)
+        time_subsampled = ConditionalDimension('t_sub', parent=model.grid.time_dim, factor=factor)
+        psave = TimeFunction(name='psave', grid=model.grid,
+                            time_order=time_order, space_order=space_order,
+                            save=nsnaps, time_dim=time_subsampled
+                            )
+        stencils += [Eq(psave, p)]
+
+    return Operator(stencils, subs=model.spacing_map, 
+                   name='ForwardVTI', **kwargs)
 
 
 

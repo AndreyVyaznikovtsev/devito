@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from scipy.signal import windows
 from argparse import Action, ArgumentError, ArgumentParser
 
 from devito import error, configuration, warning
@@ -13,7 +14,28 @@ __all__ = ['AcquisitionGeometry', 'setup_geometry', 'seismic_args']
 import numpy as np
 from scipy.fft import fft, ifft
 
-def wiener_deconvolution(obs, modeled, eps=1e-3):
+def estimate_centroid_frequency_gather(data, dt, method='median'):
+    centroids = []
+    ntraces = data.shape[1]  # Assuming data is [samples x traces]
+    
+    for trace in data.T:  # Process each trace separately
+        n = len(trace)
+        fft_data = np.fft.rfft(trace)
+        freqs = np.fft.rfftfreq(n, dt/1e3)
+        
+        power_spectrum = np.abs(fft_data)**2
+    
+        centroid = np.sum(freqs * power_spectrum) / np.sum(power_spectrum)
+        centroids.append(centroid)
+    
+    # Use median to be robust against outliers
+    if method == 'median':
+        return np.median(centroids)
+    else:
+        return np.mean(centroids)
+
+
+def wiener_deconvolution(obs, modeled, eps=1e-6):
     """
     Wiener deconvolution to estimate the source time function (STF).
     
@@ -26,9 +48,7 @@ def wiener_deconvolution(obs, modeled, eps=1e-3):
         np.ndarray: Estimated STF (shape: [time_samples]).
     """
     nt, ntr = obs.shape
-    nfft = 2 ** int(np.ceil(np.log2(nt)))  # Next power of 2 for FFT
     nfft = nt  # Next power of 2 for FFT
-
 
     # Initialize numerator and denominator
     sumn = np.zeros(nfft, dtype=complex)
@@ -36,8 +56,12 @@ def wiener_deconvolution(obs, modeled, eps=1e-3):
 
     # Compute FFT of each trace and accumulate sums
     for i in range(ntr):
-        D_obs = fft(obs[:, i])
-        D_mod = fft(modeled[:, i])
+        # Normalize each trace by its maximum absolute value
+        obs_norm = obs[:, i] / (np.max(np.abs(obs[:, i])) + eps)
+        mod_norm = modeled[:, i] / (np.max(np.abs(modeled[:, i])) + eps)
+        
+        D_obs = fft(obs_norm)
+        D_mod = fft(mod_norm)
         
         sumn += D_obs * np.conj(D_mod)  # Cross-correlation
         sumd += D_mod * np.conj(D_mod)  # Auto-correlation
@@ -53,40 +77,51 @@ def wiener_deconvolution(obs, modeled, eps=1e-3):
 
     return stf
 
-def load_velocity(path, pad_x):
-    # Read CSV file into DataFrame
-    df = pd.read_csv(path, sep=r'\s+')
-    # Convert DataFrame to numpy array
-    df_array = df.to_numpy()
+def taper_wavelet(wav3, t, t_high, t_width):
+    """
+    Taper a wavelet using the right half of a Tukey window.
     
-    # Process x and z coordinates
-    x = np.unique(df_array[:, 0])
-    x = x - np.min(x)
-    z = np.unique(df_array[:, 1])
+    Parameters:
+    -----------
+    wav3 : numpy array
+        The wavelet to be tapered
+    t : numpy array
+        Time axis corresponding to the wavelet
+    t_high : float
+        Time point until which the taper is 1
+    t_width : float
+        Length of the taper transition region
     
-    # Calculate grid spacing
-    dx = x[1] - x[0]
-    dz = z[1] - z[0]
+    Returns:
+    --------
+    tapered_wav3 : numpy array
+        The tapered wavelet
+    taper_window : numpy array
+        The applied taper window
+    """
+    # Create the taper window
+    taper_window = np.ones_like(wav3)
     
-    # Get grid dimensions
-    nx = len(x)
-    nz = len(z)
+    # Find indices for the transition region
+    idx_high = np.argmin(np.abs(t - t_high))
+    idx_end = np.argmin(np.abs(t - (t_high + t_width)))
     
-    # Reshape velocity and vxvz arrays
-    vel = df_array[:, 2].reshape(nz, nx)
-    vxvz = df_array[:, 3].reshape(nz, nx)
+    # Create a Tukey window for the transition region
+    # We'll use the right half of the window (alpha=1 gives a Hann window shape)
+    tukey_len = 2 * (idx_end - idx_high)
+    tukey_window = windows.tukey(tukey_len, alpha=1.0)
     
-    # Extend x coordinates with padding
-    x = np.arange(-pad_x*dx, pad_x*dx + x[-1] + dx, dx)
-    z = np.arange(z[0], z[-1] + dz, dz)
+    # Take the right half of the Tukey window for our taper
+    right_half = tukey_window[tukey_len//2:]
     
-    # Pad the arrays
-    vel_padded = np.pad(vel * 1000, ((0, 0), (pad_x, pad_x)), mode='edge')
-    vxvz_padded = np.pad(vxvz, ((0, 0), (pad_x, pad_x)), mode='edge')
+    # Apply the taper
+    taper_window[idx_high:idx_end] = right_half[:idx_end-idx_high]
+    taper_window[idx_end:] = 0.0
     
+    # Apply the taper to the wavelet
+    tapered_wav3 = wav3 * taper_window
     
-    return vel_padded, vxvz_padded, nz, nx, z, x, dz, dx
-
+    return tapered_wav3, taper_window
 
 
 def setup_geometry(model, tn, f0=0.010, interpolation='linear', **kwargs):

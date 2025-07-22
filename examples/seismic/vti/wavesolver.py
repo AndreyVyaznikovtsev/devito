@@ -1,6 +1,6 @@
 # coding: utf-8
 from devito import (Function, TimeFunction, warning, NODE,
-                    DevitoCheckpoint, CheckpointOperator, Revolver)
+                    DevitoCheckpoint, CheckpointOperator, Revolver, ConditionalDimension)
 from devito.tools import memoized_meth
 from examples.seismic.vti.operators import ForwardOperator, AdjointOperator
 from examples.seismic.vti.operators import JacobianOperator, JacobianAdjOperator
@@ -77,7 +77,8 @@ class VTIWaveSolver:
         return JacobianAdjOperator(self.model, save=save, geometry=self.geometry,
                                    space_order=self.space_order, **self._kwargs)
 
-    def forward(self, src=None, rec=None, p=None, model=None,
+    def forward(self, src=None, rec=None, p=None, psave=None,
+                time_subsampled=None, model=None,
                 save=False, **kwargs):
 
         # Source term is read-only, so re-use the default
@@ -85,22 +86,31 @@ class VTIWaveSolver:
         # Create a new receiver object to store the result
         rec = rec or self.geometry.rec
 
+        model = model or self.model
+
         # Create the forward wavefield if not provided
         if p is None:
             p = TimeFunction(name='p', grid=self.model.grid,
-                           save=self.geometry.nt if save else None,
+                           save=None,
                            time_order=2,
                            space_order=self.space_order)
-
-        model = model or self.model
+            
 
         # Pick vp and Thomsen parameters from model unless explicitly provided
         kwargs.update(model.physical_params(**kwargs))
-
         # Execute operator and return wavefield and receiver data
-        summary = self.op_fwd(save).apply(src=src, rec=rec, p=p,
-                                          dt=kwargs.pop('dt', self.dt), **kwargs)
-        return rec, p, summary
+
+        if save:
+            nsnaps = kwargs.pop('nsnaps', 5)
+            factor = round(self.geometry.nt / nsnaps)
+            time_subsampled = ConditionalDimension('t_sub', parent=model.grid.time_dim, factor=factor)
+            psave = TimeFunction(name='psave', grid=model.grid, time_order=2, space_order=self.space_order, save=nsnaps, time_dim=time_subsampled)
+            summary = self.op_fwd(save).apply(src=src, rec=rec, p=p, psave=psave, dt=kwargs.pop('dt', self.dt), **kwargs)
+            return rec, p, psave, summary
+
+        else:
+            summary = self.op_fwd(save).apply(src=src, rec=rec, p=p, dt=kwargs.pop('dt', self.dt), **kwargs)
+            return rec, p, summary
 
     def adjoint(self, rec, srca=None, p=None, model=None,
                 save=None, **kwargs):
