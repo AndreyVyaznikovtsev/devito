@@ -127,30 +127,32 @@ class GenericModel:
     """
     def __init__(self, origin, spacing, shape, space_order, nbl=20,
                  dtype=np.float32, subdomains=(), bcs="damp", grid=None,
-                 fs=False, topology=None, habc_type=None, habc_params=None):
+                 fs=False, topology=None,
+                #  habc_type=None, habc_params=None,
+                 ):
         self.shape = shape
         self.space_order = space_order
         self.nbl = int(nbl)
         self.origin = tuple([dtype(o) for o in origin])
         self.fs = fs
         
-        self.habc_type = habc_type  # 'a1', 'a2', 'higdon'
-        self.habc_params = habc_params or {}  # Additional parameters for HABC
+        # self.habc_type = habc_type  # 'a1', 'a2', 'higdon'
+        # self.habc_params = habc_params or {}  # Additional parameters for HABC
     
         # Default setup
         origin_pml = [dtype(o - s*nbl) for o, s in zip(origin, spacing)]
         shape_pml = np.array(shape) + 2 * self.nbl
 
-        subdomains = self._create_subdomains(subdomains, space_order, fs)
+        # subdomains = self._create_subdomains(subdomains, space_order, fs)
 
         # Model size depending on freesurface
-        # physdomain = PhysicalDomain(space_order, fs=fs)
-        # subdomains = subdomains + (physdomain,)
-        # if fs:
-        #     fsdomain = FSDomain(space_order)
-        #     subdomains = subdomains + (fsdomain,)
-        #     origin_pml[-1] = origin[-1]
-        #     shape_pml[-1] -= self.nbl
+        physdomain = PhysicalDomain(space_order, fs=fs)
+        subdomains = subdomains + (physdomain,)
+        if fs:
+            fsdomain = FSDomain(space_order)
+            subdomains = subdomains + (fsdomain,)
+            origin_pml[-1] = origin[-1]
+            shape_pml[-1] -= self.nbl
 
         # Origin of the computational domain with boundary to inject/interpolate
         # at the correct index
@@ -167,28 +169,28 @@ class GenericModel:
         self._initialize_bcs(bcs=bcs)
 
 
-    def _create_subdomains(self, subdomains, space_order, fs):
-        """Create subdomains for physical domain and HABC regions"""
-        # Physical domain subdomain (always present)
-        physdomain = PhysicalDomain(space_order, fs=fs)
-        subdomains = subdomains + (physdomain,)
-        # Free surface subdomain if needed
-        if fs:
-            fsdomain = FSDomain(space_order)
-            subdomains = subdomains + (fsdomain,)
-        # Add HABC subdomains if HABC is enabled
-        if self.habc_type is not None:
-            d1domain = HABCLeft(self.nbl)
-            d2domain = HABCRight(self.nbl)
-            d3domain = HABCBottom(self.nbl)
-            subdomains = subdomains + (d1domain, d2domain, d3domain)
+    # def _create_subdomains(self, subdomains, space_order, fs):
+    #     """Create subdomains for physical domain and HABC regions"""
+    #     # Physical domain subdomain (always present)
+    #     physdomain = PhysicalDomain(space_order, fs=fs)
+    #     subdomains = subdomains + (physdomain,)
+    #     # Free surface subdomain if needed
+    #     if fs:
+    #         fsdomain = FSDomain(space_order)
+    #         subdomains = subdomains + (fsdomain,)
+    #     # Add HABC subdomains if HABC is enabled
+    #     if self.habc_type is not None:
+    #         d1domain = HABCLeft(self.nbl)
+    #         d2domain = HABCRight(self.nbl)
+    #         d3domain = HABCBottom(self.nbl)
+    #         subdomains = subdomains + (d1domain, d2domain, d3domain)
 
-        return subdomains
+    #     return subdomains
 
     def _initialize_bcs(self, bcs="damp"):
-        if self.habc_type is not None:
-            self._initialize_habc()
-            return
+        # if self.habc_type is not None:
+        #     self._initialize_habc()
+        #     return
         
         # Create dampening field as symbol `damp`
         if self.nbl == 0:
@@ -215,77 +217,77 @@ class GenericModel:
                                 abc_type=bcs, fs=self.fs)
         self._physical_parameters.update(['damp'])
 
-    def _initialize_habc(self):
-        """
-        Initialize Hybrid Absorbing Boundary Condition fields and parameters.
-        """
-        if self.habc_type not in ['a1', 'a2', 'higdon']:
-            raise ValueError("HABC type must be 'a1', 'a2', or 'higdon'")
+    # def _initialize_habc(self):
+    #     """
+    #     Initialize Hybrid Absorbing Boundary Condition fields and parameters.
+    #     """
+    #     if self.habc_type not in ['a1', 'a2', 'higdon']:
+    #         raise ValueError("HABC type must be 'a1', 'a2', or 'higdon'")
 
-        # Create weight functions for HABC
-        self.weightsx = Function(name="weightsx", grid=self.grid,
-                                 space_order=self.space_order)
-        self.weightsz = Function(name="weightsz", grid=self.grid,
-                                 space_order=self.space_order)
+    #     # Create weight functions for HABC
+    #     self.weightsx = Function(name="weightsx", grid=self.grid,
+    #                              space_order=self.space_order)
+    #     self.weightsz = Function(name="weightsz", grid=self.grid,
+    #                              space_order=self.space_order)
         
-        # Initialize weights based on HABC type
-        self._initialize_habc_weights()
-        self._physical_parameters.update(['weightsx', 'weightsz'])
+    #     # Initialize weights based on HABC type
+    #     self._initialize_habc_weights()
+    #     self._physical_parameters.update(['weightsx', 'weightsz'])
 
-    def _initialize_habc_weights(self):
-        """
-        Initialize weight functions for HABC based on type and parameters.
-        """
-        npmlx = self.nbl
-        npmlz = self.nbl
+    # def _initialize_habc_weights(self):
+    #     """
+    #     Initialize weight functions for HABC based on type and parameters.
+    #     """
+    #     npmlx = self.nbl
+    #     npmlz = self.nbl
 
-        # Default parameters
-        habcw = self.habc_params.get('habcw', 2)  # Default to non-linear weights
-        alpha = self.habc_params.get('alpha', None)
-        P = self.habc_params.get('P', 2)
+    #     # Default parameters
+    #     habcw = self.habc_params.get('habcw', 2)  # Default to non-linear weights
+    #     alpha = self.habc_params.get('alpha', None)
+    #     P = self.habc_params.get('P', 2)
 
-        # Generate weights based on type
-        if habcw == 1:  # Linear weights
-            weightsx = np.linspace(1, 0, npmlx)
-            weightsz = np.linspace(1, 0, npmlz)
-        else:  # Non-linear weights
-            if alpha is None:
-                if self.habc_type == 'higdon':
-                    alpha = 1.0 + 0.15*(npmlx - P)
-                else:
-                    alpha = 1.5 + 0.07*(npmlx - P)
+    #     # Generate weights based on type
+    #     if habcw == 1:  # Linear weights
+    #         weightsx = np.linspace(1, 0, npmlx)
+    #         weightsz = np.linspace(1, 0, npmlz)
+    #     else:  # Non-linear weights
+    #         if alpha is None:
+    #             if self.habc_type == 'higdon':
+    #                 alpha = 1.0 + 0.15*(npmlx - P)
+    #             else:
+    #                 alpha = 1.5 + 0.07*(npmlx - P)
 
-            weightsx = np.zeros(npmlx)
-            weightsz = np.zeros(npmlz)
+    #         weightsx = np.zeros(npmlx)
+    #         weightsz = np.zeros(npmlz)
             
-            for i in range(npmlx):
-                if i <= P:
-                    weightsx[i] = 1
-                else:
-                    weightsx[i] = ((npmlx - i) / (npmlx - P))**alpha
+    #         for i in range(npmlx):
+    #             if i <= P:
+    #                 weightsx[i] = 1
+    #             else:
+    #                 weightsx[i] = ((npmlx - i) / (npmlx - P))**alpha
 
-            for i in range(npmlz):
-                if i <= P:
-                    weightsz[i] = 1
-                else:
-                    weightsz[i] = ((npmlz - i) / (npmlz - P))**alpha
+    #         for i in range(npmlz):
+    #             if i <= P:
+    #                 weightsz[i] = 1
+    #             else:
+    #                 weightsz[i] = ((npmlz - i) / (npmlz - P))**alpha
 
-        # Apply weights to the boundary layers
-        Mweightsx = np.zeros(self.shape_pml)
-        Mweightsz = np.zeros(self.shape_pml)
+    #     # Apply weights to the boundary layers
+    #     Mweightsx = np.zeros(self.shape_pml)
+    #     Mweightsz = np.zeros(self.shape_pml)
 
-        for k in range(npmlx):
-            ai = k
-            af = self.shape_pml[0] - k - 1
-            Mweightsx[ai, :] = weightsx[k]
-            Mweightsx[af, :] = weightsx[k]
+    #     for k in range(npmlx):
+    #         ai = k
+    #         af = self.shape_pml[0] - k - 1
+    #         Mweightsx[ai, :] = weightsx[k]
+    #         Mweightsx[af, :] = weightsx[k]
 
-        for k in range(npmlz):
-            bf = self.shape_pml[1] - k - 1
-            Mweightsz[:, bf] = weightsz[k]
+    #     for k in range(npmlz):
+    #         bf = self.shape_pml[1] - k - 1
+    #         Mweightsz[:, bf] = weightsz[k]
 
-        self.weightsx.data[:] = Mweightsx
-        self.weightsz.data[:] = Mweightsz
+    #     self.weightsx.data[:] = Mweightsx
+    #     self.weightsz.data[:] = Mweightsz
 
     @property
     def padsizes(self):
