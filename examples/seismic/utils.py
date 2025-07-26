@@ -101,48 +101,6 @@ def wiener_deconvolution(obs, modeled, sz, rec_z, eps=1e-6, normalize=True, kill
 
     return stf
 
-# def wiener_deconvolution(obs, modeled, eps=1e-6):
-#     """
-#     Wiener deconvolution to estimate the source time function (STF).
-    
-#     Parameters:
-#         obs (np.ndarray): Observed seismograms (shape: [time_samples, traces]).
-#         modeled (np.ndarray): Synthetic seismograms (shape: [time_samples, traces]).
-#         eps (float): Stabilization constant (default: 1e-6).
-    
-#     Returns:
-#         np.ndarray: Estimated STF (shape: [time_samples]).
-#     """
-#     nt, ntr = obs.shape
-#     nfft = nt  # Next power of 2 for FFT
-
-#     # Initialize numerator and denominator
-#     sumn = np.zeros(nfft, dtype=complex)
-#     sumd = np.zeros(nfft, dtype=complex)
-
-#     # Compute FFT of each trace and accumulate sums
-#     for i in range(ntr):
-#         # Normalize each trace by its maximum absolute value
-#         obs_norm = obs[:, i] / (np.max(np.abs(obs[:, i])) + eps)
-#         mod_norm = modeled[:, i] / (np.max(np.abs(modeled[:, i])) + eps)
-        
-#         D_obs = fft(obs_norm)
-#         D_mod = fft(mod_norm)
-        
-#         sumn += D_obs * np.conj(D_mod)  # Cross-correlation
-#         sumd += D_mod * np.conj(D_mod)  # Auto-correlation
-
-#     # Stabilization term (Ebar = average energy)
-#     Ebar = np.mean(np.abs(sumd))
-
-#     # Wiener filter in frequency domain
-#     H = sumn / (sumd + eps * ntr * Ebar)
-
-#     # Inverse FFT to get STF (truncate to original length)
-#     stf = np.real(ifft(H))[:nt]
-
-#     return stf
-
 def taper_wavelet(wav3, t, t_high, t_width):
     """
     Taper a wavelet using the right half of a Tukey window.

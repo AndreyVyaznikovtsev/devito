@@ -111,6 +111,55 @@ def overlay_wiggle_plot(
     else:
         return fig, ax
 
+def wiggle_plot(
+    data1: np.ndarray,
+    xrec: Sequence[float] | None = None,
+    time_axis=None,
+    t_scale: float = 1.0,
+    gain: float = 1.5,
+    figsize: tuple = (8, 6),
+    dpi: int = 300,
+    show: bool = False,
+):
+    # Create figure and axis
+    fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+    
+    # Set time axis if not provided
+    if time_axis is None:
+        time_axis = np.arange(data1.shape[0])
+    if xrec is None:
+        xrec = np.arange(data1.shape[1])
+        
+    xrec = np.asarray(xrec)
+    time_axis = np.asarray(time_axis)
+    tg = time_axis ** t_scale
+    dx = np.diff(xrec, prepend=xrec[0])
+    
+    # Set axis limits
+    ax.set_ylim(time_axis.max(), time_axis.min())
+    ax.set_xlim(xrec.min(), xrec.max())
+
+    # Plot first dataset (black)
+    for i, xr in enumerate(xrec):
+        trace = tg * data1[:, i]
+        if np.max(np.abs(trace)) != 0:
+            trace = gain * (dx[i] * trace / np.max(np.abs(trace))) + xr
+        else:
+            trace = trace + xr
+        
+        ax.plot(trace, time_axis, 'k-', linewidth=0.8, alpha=0.9)
+        ax.fill_betweenx(time_axis, xr, trace, where=trace > xr, color='k', alpha=0.5)
+
+    # Add labels and title
+    ax.set_xlabel("Глубина, м", fontsize=12)
+    ax.set_ylabel("Время, мс", fontsize=12)
+    plt.tight_layout()
+    
+    if show:
+        plt.show()
+    else:
+        return fig, ax
+
 def plot_three_wavelets(time_axis, wavelet1, wavelet2, wavelet3, 
                         labels=["Initial STF", "True STF", "Deconvolved STF"],
                         title="Source Time Function Comparison",

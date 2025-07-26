@@ -181,6 +181,9 @@ class VelocityModel:
         epsilon = self._current_model['vxvz'] - 1
         epsilon[epsilon < 0] = 0.
         return (2 * self._current_model['vel']) / (2 + epsilon)
+        # vp = self._current_model['vel'] * 0 + 2.5
+        # vp[:vp.shape[0]//2, :] = 3.5
+        # return vp
     
     @property
     def epsilon(self):
