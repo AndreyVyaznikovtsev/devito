@@ -226,7 +226,7 @@ def plot_velocity(model, source=None, receiver=None, colorbar=True, cmap="jet"):
     colorbar : bool
         Option to plot the colorbar.
     """
-    domain_size = 1.e-3 * np.array(model.domain_size)
+    domain_size = np.array(model.domain_size)
     extent = [model.origin[0], model.origin[0] + domain_size[0],
               model.origin[1] + domain_size[1], model.origin[1]]
 
@@ -243,12 +243,12 @@ def plot_velocity(model, source=None, receiver=None, colorbar=True, cmap="jet"):
 
     # Plot source points, if provided
     if receiver is not None:
-        plt.scatter(1e-3*receiver[:, 0], 1e-3*receiver[:, 1],
+        plt.scatter(receiver[:, 0], receiver[:, 1],
                     s=25, c='green', marker='D')
 
     # Plot receiver points, if provided
     if source is not None:
-        plt.scatter(1e-3*source[:, 0], 1e-3*source[:, 1],
+        plt.scatter(source[:, 0], source[:, 1],
                     s=25, c='red', marker='o')
 
     # Ensure axis limits
@@ -282,15 +282,15 @@ def plot_shotrecord(rec, t0, tn, colorbar=True):
     """
     scale = np.max(rec) / 5.
     # extent = [model.origin[0], model.origin[0] + 1e-3*model.domain_size[0],
-    #           model.origin[1] + 1e-3*model.domain_size[1], model.origin[1]]
+            #   model.origin[1] + 1e-3*model.domain_size[1], model.origin[1]]
     print(rec.shape)
     plot = plt.imshow(rec.T, vmin=-scale, vmax=scale, cmap=cm.gray, aspect='equal')
     plt.xlabel('X position (km)')
     plt.ylabel('Y position (km)')
-    major_ticks = np.arange(0, rec.shape[0], 50)
+    # major_ticks = np.arange(0, rec.shape[0], 500)
     ax = plt.gca()
-    ax.set_xticks(major_ticks)
-    ax.set_yticks(major_ticks)
+    # ax.set_xticks(major_ticks)
+    # ax.set_yticks(major_ticks)
     plt.grid()
 
     # Create aligned colorbar on the right

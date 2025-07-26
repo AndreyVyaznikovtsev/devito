@@ -35,14 +35,19 @@ def estimate_centroid_frequency_gather(data, dt, method='median'):
         return np.mean(centroids)
 
 
-def wiener_deconvolution(obs, modeled, eps=1e-6):
+def wiener_deconvolution(obs, modeled, sz, rec_z, eps=1e-6, normalize=True, kill_offset=False, offset_threshold=0):
     """
-    Wiener deconvolution to estimate the source time function (STF).
+    Wiener deconvolution to estimate the source time function (STF) with optional offset filtering.
     
     Parameters:
         obs (np.ndarray): Observed seismograms (shape: [time_samples, traces]).
         modeled (np.ndarray): Synthetic seismograms (shape: [time_samples, traces]).
+        sz (float): Source elevation.
+        rec_z (np.ndarray): Receiver elevations (shape: [traces]).
         eps (float): Stabilization constant (default: 1e-6).
+        normalize (bool): Whether to normalize traces by their maximum amplitude (default: True).
+        kill_offset (bool): Whether to exclude near offsets (default: False).
+        offset_threshold (float): Minimum absolute offset to include (used if kill_offset=True).
     
     Returns:
         np.ndarray: Estimated STF (shape: [time_samples]).
@@ -50,15 +55,31 @@ def wiener_deconvolution(obs, modeled, eps=1e-6):
     nt, ntr = obs.shape
     nfft = nt  # Next power of 2 for FFT
 
+    # Calculate offsets for each trace
+    offsets = np.abs(rec_z - sz)
+    
     # Initialize numerator and denominator
     sumn = np.zeros(nfft, dtype=complex)
     sumd = np.zeros(nfft, dtype=complex)
+    
+    # Count of traces actually used
+    used_traces = 0
 
     # Compute FFT of each trace and accumulate sums
     for i in range(ntr):
-        # Normalize each trace by its maximum absolute value
-        obs_norm = obs[:, i] / (np.max(np.abs(obs[:, i])) + eps)
-        mod_norm = modeled[:, i] / (np.max(np.abs(modeled[:, i])) + eps)
+        # Skip near offsets if kill_offset is True
+        if kill_offset and offsets[i] <= offset_threshold:
+            continue
+            
+        used_traces += 1
+        
+        # Normalize if requested
+        if normalize:
+            obs_norm = obs[:, i] / (np.max(np.abs(obs[:, i])) + eps)
+            mod_norm = modeled[:, i] / (np.max(np.abs(modeled[:, i])) + eps)
+        else:
+            obs_norm = obs[:, i]
+            mod_norm = modeled[:, i]
         
         D_obs = fft(obs_norm)
         D_mod = fft(mod_norm)
@@ -66,16 +87,61 @@ def wiener_deconvolution(obs, modeled, eps=1e-6):
         sumn += D_obs * np.conj(D_mod)  # Cross-correlation
         sumd += D_mod * np.conj(D_mod)  # Auto-correlation
 
+    if used_traces == 0:
+        raise ValueError("No traces available after offset filtering - check your offset threshold")
+
     # Stabilization term (Ebar = average energy)
     Ebar = np.mean(np.abs(sumd))
 
     # Wiener filter in frequency domain
-    H = sumn / (sumd + eps * ntr * Ebar)
+    H = sumn / (sumd + eps * used_traces * Ebar)
 
     # Inverse FFT to get STF (truncate to original length)
     stf = np.real(ifft(H))[:nt]
 
     return stf
+
+# def wiener_deconvolution(obs, modeled, eps=1e-6):
+#     """
+#     Wiener deconvolution to estimate the source time function (STF).
+    
+#     Parameters:
+#         obs (np.ndarray): Observed seismograms (shape: [time_samples, traces]).
+#         modeled (np.ndarray): Synthetic seismograms (shape: [time_samples, traces]).
+#         eps (float): Stabilization constant (default: 1e-6).
+    
+#     Returns:
+#         np.ndarray: Estimated STF (shape: [time_samples]).
+#     """
+#     nt, ntr = obs.shape
+#     nfft = nt  # Next power of 2 for FFT
+
+#     # Initialize numerator and denominator
+#     sumn = np.zeros(nfft, dtype=complex)
+#     sumd = np.zeros(nfft, dtype=complex)
+
+#     # Compute FFT of each trace and accumulate sums
+#     for i in range(ntr):
+#         # Normalize each trace by its maximum absolute value
+#         obs_norm = obs[:, i] / (np.max(np.abs(obs[:, i])) + eps)
+#         mod_norm = modeled[:, i] / (np.max(np.abs(modeled[:, i])) + eps)
+        
+#         D_obs = fft(obs_norm)
+#         D_mod = fft(mod_norm)
+        
+#         sumn += D_obs * np.conj(D_mod)  # Cross-correlation
+#         sumd += D_mod * np.conj(D_mod)  # Auto-correlation
+
+#     # Stabilization term (Ebar = average energy)
+#     Ebar = np.mean(np.abs(sumd))
+
+#     # Wiener filter in frequency domain
+#     H = sumn / (sumd + eps * ntr * Ebar)
+
+#     # Inverse FFT to get STF (truncate to original length)
+#     stf = np.real(ifft(H))[:nt]
+
+#     return stf
 
 def taper_wavelet(wav3, t, t_high, t_width):
     """

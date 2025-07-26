@@ -3,6 +3,8 @@ from segyio import TraceField
 import numpy as np
 from typing import Tuple, Optional
 import matplotlib.pyplot as plt
+from IPython.display import HTML
+import matplotlib.animation as animation
 from scipy import signal
 
 class SeismogramDataset:
@@ -12,7 +14,7 @@ class SeismogramDataset:
     извлекать сборки (gathers) и визуализировать их.
     """
 
-    def __init__(self, sgy_path: str, sort_key: str = "sou", resample: bool = False):
+    def __init__(self, sgy_path: str, sort_key: str = "sou", resample: bool = False, invert_elevs: bool = False):
         """
         Инициализация датасета с файлом SEG-Y и ключом сортировки.
 
@@ -28,6 +30,7 @@ class SeismogramDataset:
         self._resample = resample
         self._dt_r = None  # Target sample interval for resampling
         self._t_max_r = None  # Maximum time for resampling
+        self._invert_elevs = invert_elevs
         
         # Открытие файла и чтение заголовков
         with segyio.open(sgy_path, ignore_geometry=True) as f:
@@ -50,6 +53,10 @@ class SeismogramDataset:
                 self.x_coords = np.array([f.header[trace][TraceField.GroupX] / source_group_scalar for trace in range(f.tracecount)])
                 self.opposite_x = np.array([f.header[trace][TraceField.SourceX] / source_group_scalar for trace in range(f.tracecount)])
                 self.opposite_elev = np.array([f.header[trace][TraceField.SourceSurfaceElevation] / elevation_scalar for trace in range(f.tracecount)])
+
+            if self._invert_elevs:
+                self.elevations *= -1
+                self.opposite_elev *= -1
 
             # Получение уникальных значений высот и их индексов
             self.unique_elevations = np.unique(self.elevations)
@@ -215,3 +222,198 @@ class SeismogramDataset:
         plt.title(f"Сейсмограмма {title_type} #{idx}")
         plt.colorbar(label="Амплитуда")
         plt.show()
+
+
+    def plot_spectrum(self, idx: int, figsize=(10, 6), db_scale: bool = True, 
+                    min_freq: float = None, max_freq: float = None):
+        """
+        Plots the mean amplitude spectrum of traces in the specified gather.
+        
+        Args:
+            idx: Index of the gather to analyze
+            figsize: Size of the figure
+            db_scale: Whether to plot in dB scale (20*log10)
+            min_freq: Minimum frequency to display (Hz)
+            max_freq: Maximum frequency to display (Hz)
+        """
+        gather, _, _, _, _ = self.__getitem__(idx)
+        
+        # Calculate FFT for each trace
+        n = gather.shape[1]  # Number of samples
+        if self._resample:
+            dt = self._dt_r
+        else:
+            dt = self._dt
+            
+        frequencies = np.fft.rfftfreq(n, d=dt/1000)  # Convert dt to seconds for Hz
+        spectra = np.abs(np.fft.rfft(gather, axis=1))
+        
+        # Calculate mean spectrum
+        mean_spectrum = np.mean(spectra, axis=0)
+        
+        # Convert to dB if requested
+        if db_scale:
+            mean_spectrum = 20 * np.log10(mean_spectrum)
+            ylabel = "Amplitude (dB)"
+        else:
+            ylabel = "Amplitude"
+        
+        # Plot
+        plt.figure(figsize=figsize)
+        plt.plot(frequencies, mean_spectrum)
+        
+        # Set frequency limits if specified
+        if min_freq is not None or max_freq is not None:
+            current_xlim = plt.xlim()
+            new_min = min_freq if min_freq is not None else current_xlim[0]
+            new_max = max_freq if max_freq is not None else current_xlim[1]
+            plt.xlim(new_min, new_max)
+        
+        plt.xlabel("Frequency (Hz)")
+        plt.ylabel(ylabel)
+        title_type = "ОПВ" if self.sort_key == "sou" else "ОПП"
+        plt.title(f"Mean amplitude spectrum of {title_type} gather #{idx}")
+        plt.grid(True)
+        plt.show()
+
+    
+    def plot_spectrum_map(self, idx: int, figsize=(12, 8), db_scale: bool = False,
+                     min_freq: float = None, max_freq: float = None,
+                     n_bins: int = 100, cmap='viridis', quant=0.99):
+        """
+        Plots a 2D spectrum map showing frequency distribution across traces.
+        
+        Args:
+            idx: Index of the gather to analyze
+            figsize: Size of the figure
+            db_scale: Whether to plot in dB scale (20*log10)
+            min_freq: Minimum frequency to display (Hz)
+            max_freq: Maximum frequency to display (Hz)
+            n_bins: Number of frequency bins
+            cmap: Colormap for the visualization
+        """
+        gather, _, _, _, opposite_elev = self.__getitem__(idx)
+        
+        # Calculate FFT for each trace
+        n = gather.shape[1]  # Number of samples
+        if self._resample:
+            dt = self._dt_r
+        else:
+            dt = self._dt
+            
+        frequencies = np.fft.rfftfreq(n, d=dt/1000)  # Convert dt to seconds for Hz
+        spectra = np.abs(np.fft.rfft(gather, axis=1))
+        
+        # Convert to dB if requested
+        if db_scale:
+            spectra = 10 * np.log10(spectra)
+        
+        # Create frequency bins
+        if min_freq is None:
+            min_freq = frequencies[0]
+        if max_freq is None:
+            max_freq = frequencies[-1]
+    
+        
+        # Plot
+        plt.figure(figsize=figsize)
+        extent = [0, frequencies[-1], opposite_elev[-1], opposite_elev[0]]
+        plt.imshow(spectra, aspect='auto', cmap=cmap, extent=extent)
+        plt.xlim(min_freq, max_freq)
+        plt.xlabel("Частота, Гц")
+        plt.ylabel("Абс. отм., м")
+        title_type = "ОПВ" if self.sort_key == "sou" else "ОПП"
+        plt.title(f"Карта спектров сейсмограммы {title_type} #{idx}")
+        plt.colorbar(label="Амплитуда, дБ" if db_scale else "Амплитуда")
+        plt.grid(False)
+        plt.show()
+
+
+    def create_spectrum_animation(self, start_idx: int = 0, end_idx: int = None, 
+                                figsize=(12, 8), db_scale: bool = False,
+                                min_freq: float = None, max_freq: float = None,
+                                cmap='viridis', quant=0.99, interval=50, fps=15):
+        """
+        Creates an animation of spectrum maps across multiple gathers.
+        
+        Args:
+            start_idx: Starting gather index
+            end_idx: Ending gather index (None for all gathers)
+            figsize: Size of the figure
+            db_scale: Whether to plot in dB scale (10*log10)
+            min_freq: Minimum frequency to display (Hz)
+            max_freq: Maximum frequency to display (Hz)
+            cmap: Colormap for the visualization
+            quant: Quantile for amplitude scaling
+            interval: Delay between frames in milliseconds
+            fps: Frames per second for the output video
+        """
+        if end_idx is None:
+            end_idx = len(self) - 1
+        
+        # Get the first gather to set up the figure
+        first_gather, _, _, _, opposite_elev = self.__getitem__(start_idx)
+        n = first_gather.shape[1]
+        if self._resample:
+            dt = self._dt_r
+        else:
+            dt = self._dt
+        frequencies = np.fft.rfftfreq(n, d=dt/1000)
+        
+        if min_freq is None:
+            min_freq = frequencies[0]
+        if max_freq is None:
+            max_freq = frequencies[-1]
+        
+        # Set up the figure
+        fig, ax = plt.subplots(figsize=figsize)
+        ax.set_xlabel("Частота, Гц")
+        ax.set_ylabel("Абс. отм., м")
+        title_type = "ОПВ" if self.sort_key == "sou" else "ОПП"
+        title = ax.set_title(f"Карта спектров сейсмограммы {title_type} #{start_idx}")
+        
+        # Get elevation range from first gather
+        extent = [min_freq, max_freq, opposite_elev[-1], opposite_elev[0]]
+        
+        # Initialize empty image
+        img = ax.imshow(np.zeros((len(opposite_elev), len(frequencies))), 
+                    aspect='auto', cmap=cmap, extent=extent)
+        
+        # Add colorbar
+        cbar = fig.colorbar(img, ax=ax)
+        cbar.set_label("Амплитуда, дБ" if db_scale else "Амплитуда")
+        
+        # Pre-compute all spectra
+        all_spectra = []
+        max_val = 0
+        for idx in range(start_idx, end_idx + 1):
+            gather, _, _, _, opposite_elev = self.__getitem__(idx)
+            spectra = np.abs(np.fft.rfft(gather, axis=1))
+            if db_scale:
+                spectra = 10 * np.log10(spectra)
+            all_spectra.append(spectra)
+            current_max = np.quantile(spectra, quant)
+            if current_max > max_val:
+                max_val = current_max
+        
+        # Set consistent vmax across all frames
+        img.set_clim(vmax=max_val)
+        
+        # Animation update function
+        def update(frame):
+            idx = frame + start_idx
+            spectra = all_spectra[frame]
+            img.set_array(spectra)
+            title.set_text(f"Карта спектров сейсмограммы {title_type} #{idx}")
+            return img, title
+        
+        # Create animation
+        ani = animation.FuncAnimation(
+            fig, update, frames=len(all_spectra), 
+            interval=interval, blit=True
+        )
+        
+        plt.close(fig)
+        
+        # Return as HTML5 video
+        return HTML(ani.to_html5_video())
