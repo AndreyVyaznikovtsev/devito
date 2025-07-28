@@ -1,10 +1,6 @@
 import numpy as np
 from scipy.fft import fft, ifft
-from scipy import signal as windows
-
-def calculate_offsets(sz, rec_z):
-    """Calculate absolute offsets between source and receivers."""
-    return np.abs(rec_z - sz)
+from scipy.signal import windows
 
 def apply_normalization(data, eps=1e-6):
     """Normalize each trace by its maximum absolute value."""
@@ -58,7 +54,8 @@ def taper_traces_vectorized(data, first_breaks, time_axis, window_before=0, wind
 
 def compute_fft_components(obs, modeled, offsets, offset_threshold):
     """Compute FFT components with optional offset filtering."""
-    mask = offsets > offset_threshold
+    mask = offsets > (np.max(offsets) - offset_threshold)
+    print(mask)
     obs_masked = obs[:, mask]
     mod_masked = modeled[:, mask]
     
@@ -94,8 +91,9 @@ def wiener_deconvolution(obs, modeled, sz, rec_z, time_axis, first_breaks=None,
         np.ndarray: Estimated STF (shape: [time_samples]).
     """
     # Calculate offsets
-    offsets = calculate_offsets(sz, rec_z)
-    
+    offsets = np.abs(rec_z - sz)
+    mask = offsets > (np.max(offsets) - offset_threshold)
+    used_rec_z = rec_z[mask]
     # Apply first-break tapering if provided
     if first_breaks is not None:
         obs = taper_traces_vectorized(obs, first_breaks, time_axis, taper_before, taper_after)
@@ -122,4 +120,4 @@ def wiener_deconvolution(obs, modeled, sz, rec_z, time_axis, first_breaks=None,
     # Inverse FFT to get STF
     stf = np.real(ifft(H))[:len(time_axis)]
     
-    return stf
+    return stf, obs[:, mask], modeled[:, mask], used_rec_z

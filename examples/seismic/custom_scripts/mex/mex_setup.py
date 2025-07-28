@@ -12,8 +12,8 @@ from devito import Eq, Operator
 from examples.seismic import plot_image
 from devito import mmax
 
-PATH_MODEL = "../data/South_ForMigr_2.dat"
-PATH_DATA = path = "../data/21-20.sgy"
+PATH_MODEL = "../../data/South_ForMigr_2.dat"
+PATH_DATA = path = "../../data/21-20.sgy"
 SO = 4
 NBL = 100
 
@@ -34,16 +34,19 @@ def fwi_gradient(vp_in, model, geometry, dataset, nshots, solver):
                      time_range=geometry.time_axis, 
                      coordinates=geometry.rec_positions)
     objective = 0.
-    for i in range(nshots):
+    for i in range(5, nshots, 5):
         # Update source location
         d_obs, sx, sz, rec_x, rec_z = dataset[i]
-        d_obs *= -1
-        sz *= -1
-        
-        geometry.src_positions[0, :] = np.array([sx, sz])[None, :]
+        src_pos=np.array([sx, sz])[None, :]
+        t0 = geometry.t0
+        tn = geometry.tn
+        wav_data = np.load(f"mex/conventional_wavelets/{i+1}.npy")
+        geometry_shot = AcquisitionGeometry(model, geometry.rec_positions,
+                                            src_pos, t0, tn, f0=0.3,
+                                            src_type=None, wav_data=wav_data)
 
         # Compute smooth data and full forward wavefield u0
-        _, u0, _ = solver.forward(vp=vp_in, save=True, rec=d_syn)
+        _, u0, _ = solver.forward(vp=vp_in, save=True, rec=d_syn, src=geometry_shot.src)
         
         compute_residual(residual, d_obs, d_syn)
         objective += .5*norm(residual)**2
@@ -53,18 +56,18 @@ def fwi_gradient(vp_in, model, geometry, dataset, nshots, solver):
 
 
 def main():
-    dataset = SeismogramDataset(PATH_DATA, "rec")
+    dataset = SeismogramDataset(PATH_DATA, "sou", invert_elevs=True)
     # for i in range(len(dataset)):
     #     dataset.plot_spectrum_map(i, db_scale=False, n_bins=250, figsize=(8, 2), max_freq=8000, quant=1, cmap='jet')
     xmin, xmax = min(dataset.x_coords.min(), dataset.opposite_x.min()), max(dataset.x_coords.max(), dataset.opposite_x.max())
     print(xmin, xmax)
 
-    spacing = (0.1, 0.1)
+    spacing = (0.025, 0.025)
     velmodel = VelocityModel(PATH_MODEL, dx=spacing[0], dz=spacing[1], clip=True, xmin=xmin-3, xmax=xmax+3, zmin=-318)
     velmodel.pad_left(4)
-    velmodel.pad_right(8*int(0.5/0.1))
-    velmodel.pad_bottom(10*int(0.5/0.1))
-    velmodel.pad_top(7*int(0.5/0.1))
+    velmodel.pad_right(8*int(0.5/0.025))
+    velmodel.pad_bottom(10*int(0.5/0.025))
+    velmodel.pad_top(7*int(0.5/0.025))
 
     vp = velmodel.vp.T
     print(np.max(vp))
@@ -93,19 +96,17 @@ def main():
     )
     t0 = 0
     tn = dataset._t_max
-    tn = 40.0
+    # tn = 40.0
     dataset.dt_r = model.critical_dt
     dataset.t_max_r = tn
     dataset.resample_on()
     
     d_2, sx, sz, rec_x, rec_z = dataset[0]
-    rec_z *= -1
-    sz *= -1
     src_pos = np.array([sx, sz])[None, :]
     rec_pos = np.vstack([rec_x, rec_z]).T
-    f0=0.4
+    f0=0.25
 
-    geometry =  AcquisitionGeometry(model, rec_pos, src_pos, t0, tn, f0=f0*2, src_type="Gabor")
+    geometry =  AcquisitionGeometry(model, rec_pos, src_pos, t0, tn, f0=f0*2, src_type="Ricker")
     solver = AcousticWaveSolver(model, geometry, space_order=4)
 
     ff, update = fwi_gradient(model.vp, model, geometry, dataset, len(dataset), solver)

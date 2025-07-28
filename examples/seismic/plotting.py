@@ -199,7 +199,8 @@ def plot_three_wavelets(time_axis, wavelet1, wavelet2, wavelet3,
 def plot_seis_double_hor(seis1, seis2, time_range, z, titles, show=False):
     fig, axs = plt.subplots(1, 2, figsize=(6.375*2, 4), sharey=True, dpi=300)
     vm1 = np.quantile(seis1, 0.99)
-    vm2 = np.quantile(seis2, 0.99)
+    # vm2 = np.quantile(seis2, 0.99)
+    vm2 = vm1
 
     
     # Calculate extent [left, right, bottom, top]

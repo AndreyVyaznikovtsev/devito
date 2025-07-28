@@ -2,7 +2,7 @@ import os
 import time
 import numpy as np
 from matplotlib import pyplot as plt
-from examples.seismic.utils import wiener_deconvolution, taper_wavelet, estimate_centroid_frequency_gather
+from examples.seismic.utils import taper_wavelet, estimate_centroid_frequency_gather
 from examples.seismic import SeismicModel, AcquisitionGeometry
 from examples.seismic.acoustic import AcousticWaveSolver
 from examples.seismic.plotting import plot_two_wavelets, overlay_wiggle_plot
