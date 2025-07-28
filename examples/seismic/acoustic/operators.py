@@ -1,6 +1,6 @@
-from devito import Eq, Operator, Function, TimeFunction, Inc, solve, sign
+from devito import Eq, Operator, Function, TimeFunction, Inc, solve, sign, ConditionalDimension, Grid
 from devito.symbolics import retrieve_functions, INT, retrieve_derivatives
-
+from math import floor
 
 def freesurface(model, eq):
     """
@@ -131,23 +131,56 @@ def ForwardOperator(model, geometry, space_order=4,
 
     # Create symbols for forward wavefield, source and receivers
     u = TimeFunction(name='u', grid=model.grid,
-                     save=geometry.nt if save else None,
-                     time_order=2, space_order=space_order)
+                     save=None, time_order=2,
+                     space_order=space_order)
     src = geometry.src
     rec = geometry.rec
 
     s = model.grid.stepping_dim.spacing
-    eqn = iso_stencil(u, model, kernel)
+    stencils = iso_stencil(u, model, kernel)
 
     # Construct expression to inject source values
-    src_term = src.inject(field=u.forward, expr=src * s**2 / m)
+    stencils += src.inject(field=u.forward, expr=src * s**2 / m)
+    stencils += rec.interpolate(expr=u)
 
-    # Create interpolation expression for receivers
-    rec_term = rec.interpolate(expr=u)
-
+    if save:
+        nx, nz = model.grid.shape  # Original dimensions
+        dx, dz = model.grid.spacing  # Grid spacing
+        
+        # Calculate subsampling factors
+        x_subsample = 10
+        z_subsample = 10
+        sub_nx = nx // x_subsample
+        sub_nz = nz // z_subsample
+        
+        # Handle time subsampling
+        nsnaps = kwargs.pop('nsnaps', 500)
+        time_factor = max(1, round(geometry.nt / nsnaps))
+        time_sub = ConditionalDimension('t_sub', parent=model.grid.time_dim, 
+                                    factor=time_factor)
+        
+        # Create subsampled spatial dimensions
+        x_sub = ConditionalDimension('x_sub', parent=model.grid.dimensions[0], 
+                                    factor=x_subsample)
+        z_sub = ConditionalDimension('z_sub', parent=model.grid.dimensions[1], 
+                                    factor=z_subsample)
+        
+        # Create subsampled grid with explicit parameters
+        subgrid = Grid(shape=(sub_nx, sub_nz),
+                    extent=model.grid.extent,
+                    origin=model.origin,
+                    dimensions=(x_sub, z_sub),
+                    dtype=model.grid.dtype)
+        
+        # Create storage for subsampled wavefield
+        usave = TimeFunction(name='usave', grid=subgrid,
+                        time_order=2, space_order=space_order,
+                        save=nsnaps, time_dim=time_sub)
+        
+        stencils += [Eq(usave, u, implicit_dims=[x_sub, z_sub])]
     # Substitute spacing terms to reduce flops
-    return Operator(eqn + src_term + rec_term, subs=model.spacing_map,
-                    name='Forward', **kwargs)
+    return Operator(stencils, subs=model.spacing_map,
+                    name='Forward', opt=('advanced', {'gpu-fit': u}), **kwargs)
 
 
 def AdjointOperator(model, geometry, space_order=4,

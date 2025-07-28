@@ -1,4 +1,4 @@
-from devito import Function, TimeFunction, DevitoCheckpoint, CheckpointOperator, Revolver
+from devito import Function, TimeFunction, ConditionalDimension, DevitoCheckpoint, CheckpointOperator, Revolver, Grid
 from devito.tools import memoized_meth
 from examples.seismic.acoustic.operators import (
     ForwardOperator, AdjointOperator, GradientOperator, BornOperator
@@ -72,48 +72,62 @@ class AcousticWaveSolver:
                             **self._kwargs)
 
     def forward(self, src=None, rec=None, u=None, model=None, save=None, **kwargs):
-        """
-        Forward modelling function that creates the necessary
-        data objects for running a forward modelling operator.
-
-        Parameters
-        ----------
-        src : SparseTimeFunction or array_like, optional
-            Time series data for the injected source term.
-        rec : SparseTimeFunction or array_like, optional
-            The interpolated receiver data.
-        u : TimeFunction, optional
-            Stores the computed wavefield.
-        model : Model, optional
-            Object containing the physical parameters.
-        vp : Function or float, optional
-            The time-constant velocity.
-        save : bool, optional
-            Whether or not to save the entire (unrolled) wavefield.
-
-        Returns
-        -------
-        Receiver, wavefield and performance summary
-        """
-        # Source term is read-only, so re-use the default
         src = src or self.geometry.src
-        # Create a new receiver object to store the result
         rec = rec or self.geometry.rec
 
-        # Create the forward wavefield if not provided
+        # Create wavefield with main grid dimensions
         u = u or TimeFunction(name='u', grid=self.model.grid,
-                              save=self.geometry.nt if save else None,
-                              time_order=2, space_order=self.space_order)
+                            save=None, time_order=2,
+                            space_order=self.space_order)
 
         model = model or self.model
-        # Pick vp from model unless explicitly provided
         kwargs.update(model.physical_params(**kwargs))
 
-        # Execute operator and return wavefield and receiver data
-        summary = self.op_fwd(save).apply(src=src, rec=rec, u=u,
-                                          dt=kwargs.pop('dt', self.dt), **kwargs)
-
-        return rec, u, summary
+        if save:
+            # Get explicit grid parameters
+            nx, nz = model.grid.shape  # Original dimensions
+            dx, dz = model.grid.spacing  # Grid spacing
+            
+            # Calculate subsampling factors
+            x_subsample = 10
+            z_subsample = 10
+            sub_nx = nx // x_subsample
+            sub_nz = nz // z_subsample
+            
+            # Handle time subsampling
+            nsnaps = kwargs.pop('nsnaps', 500)
+            time_factor = max(1, round(self.geometry.nt / nsnaps))
+            time_sub = ConditionalDimension('t_sub', parent=model.grid.time_dim, 
+                                        factor=time_factor)
+            
+            # Create subsampled spatial dimensions
+            x_sub = ConditionalDimension('x_sub', parent=model.grid.dimensions[0], 
+                                        factor=x_subsample)
+            z_sub = ConditionalDimension('z_sub', parent=model.grid.dimensions[1], 
+                                        factor=z_subsample)
+            
+            # Create subsampled grid with explicit parameters
+            subgrid = Grid(shape=(sub_nx, sub_nz),
+                        extent=model.grid.extent,
+                        origin=model.origin,
+                        dimensions=(x_sub, z_sub),
+                        dtype=model.grid.dtype)
+            
+            # Create storage for subsampled wavefield
+            usave = TimeFunction(name='usave', grid=subgrid,
+                            time_order=2, space_order=self.space_order,
+                            save=nsnaps, time_dim=time_sub)
+            
+            kwargs['usave'] = usave
+            summary = self.op_fwd(save).apply(src=src, rec=rec, u=u, 
+                                            dt=kwargs.pop('dt', self.dt), 
+                                            **kwargs)
+            return rec, u, usave, summary
+        else:
+            summary = self.op_fwd(save).apply(src=src, rec=rec, u=u, 
+                                            dt=kwargs.pop('dt', self.dt), 
+                                            **kwargs)
+            return rec, u, summary
 
     def adjoint(self, rec, srca=None, v=None, model=None, **kwargs):
         """

@@ -15,6 +15,8 @@ SO = 4
 NBL = 100
 WAVELET = "Gabor"
 
+
+#TODO Need Refactoring
 def main():
 
     os.makedirs(f"mex/forward_initial_{WAVELET}", exist_ok=True)

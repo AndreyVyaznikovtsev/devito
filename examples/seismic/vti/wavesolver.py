@@ -107,7 +107,6 @@ class VTIWaveSolver:
             psave = TimeFunction(name='psave', grid=model.grid, time_order=2, space_order=self.space_order, save=nsnaps, time_dim=time_subsampled)
             summary = self.op_fwd(save).apply(src=src, rec=rec, p=p, psave=psave, dt=kwargs.pop('dt', self.dt), **kwargs)
             return rec, p, psave, summary
-
         else:
             summary = self.op_fwd(save).apply(src=src, rec=rec, p=p, dt=kwargs.pop('dt', self.dt), **kwargs)
             return rec, p, summary
