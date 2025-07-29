@@ -103,7 +103,6 @@ class VelocityModel:
             # Interpolate onto regular grid
             new_vel = vel_interp(new_xx, new_zz)
             new_vxvz = vxvz_interp(new_xx, new_zz)
-            print(new_vel.shape)
             
             self._current_model = {
                 'vel': new_vel,

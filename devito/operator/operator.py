@@ -611,8 +611,6 @@ class Operator(Callable):
                 args.reduce_inplace()
             except ValueError:
                 v = [i for i in overrides if i.name in args]
-                print(type(p), p.time_size, p.grid)
-                print(type(v[-1]), v[-1].time_size, v[-1].grid)
                 raise InvalidArgument(
                     f"Override `{p}` is incompatible with overrides `{v}`"
                 )

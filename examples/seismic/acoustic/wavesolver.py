@@ -3,7 +3,7 @@ from devito.tools import memoized_meth
 from examples.seismic.acoustic.operators import (
     ForwardOperator, AdjointOperator, GradientOperator, BornOperator
 )
-
+import numpy as np
 
 class AcousticWaveSolver:
     """
@@ -86,42 +86,37 @@ class AcousticWaveSolver:
         if save:
             # Get explicit grid parameters
             nx, nz = model.grid.shape  # Original dimensions
-            dx, dz = model.grid.spacing  # Grid spacing
             
             # Calculate subsampling factors
             x_subsample = 10
             z_subsample = 10
-            sub_nx = nx // x_subsample
-            sub_nz = nz // z_subsample
+            sub_nx = nx // x_subsample + 1
+            sub_nz = nz // z_subsample + 1
+            # Calculate subsampling factors
             
+
             # Handle time subsampling
             nsnaps = kwargs.pop('nsnaps', 500)
+            # nsnaps = 223
+
             time_factor = max(1, round(self.geometry.nt / nsnaps))
             time_sub = ConditionalDimension('t_sub', parent=model.grid.time_dim, 
-                                        factor=time_factor)
-            
-            # Create subsampled spatial dimensions
-            x_sub = ConditionalDimension('x_sub', parent=model.grid.dimensions[0], 
+                                            factor=time_factor)
+            x_sub = ConditionalDimension(name='x_sub', parent=model.grid.dimensions[0], 
                                         factor=x_subsample)
-            z_sub = ConditionalDimension('z_sub', parent=model.grid.dimensions[1], 
+            z_sub = ConditionalDimension(name='z_sub', parent=model.grid.dimensions[1], 
                                         factor=z_subsample)
             
-            # Create subsampled grid with explicit parameters
-            subgrid = Grid(shape=(sub_nx, sub_nz),
-                        extent=model.grid.extent,
-                        origin=model.origin,
-                        dimensions=(x_sub, z_sub),
-                        dtype=model.grid.dtype)
+            # # Create storage for subsampled wavefield
+            usave = TimeFunction(name='usave', grid=model.grid, dimensions=(time_sub, x_sub, z_sub), shape=(nsnaps, sub_nx, sub_nz), time_dim=time_sub, save=nsnaps)
+
+            self._kwargs.update({'nsnaps': nsnaps, 'time_factor': time_factor,
+                                 'x_subsample': x_subsample, 'z_subsample': z_subsample})
             
-            # Create storage for subsampled wavefield
-            usave = TimeFunction(name='usave', grid=subgrid,
-                            time_order=2, space_order=self.space_order,
-                            save=nsnaps, time_dim=time_sub)
-            
-            kwargs['usave'] = usave
-            summary = self.op_fwd(save).apply(src=src, rec=rec, u=u, 
-                                            dt=kwargs.pop('dt', self.dt), 
-                                            **kwargs)
+            summary = self.op_fwd(True).apply(src=src, rec=rec,
+                                              u=u,
+                                              usave=usave,
+                                              dt=kwargs.pop('dt', self.dt), **kwargs)
             return rec, u, usave, summary
         else:
             summary = self.op_fwd(save).apply(src=src, rec=rec, u=u, 

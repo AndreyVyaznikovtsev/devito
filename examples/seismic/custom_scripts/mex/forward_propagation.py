@@ -56,9 +56,10 @@ def main():
         solver = AcousticWaveSolver(model, geometry, space_order=SO)
 
         _, _, psave, _  = solver.forward(vp=model.vp, src=geometry.src, save=True, nsnaps=500)
+        print(psave.shape)
         filename = f"forward_snaps/{i+1}.bin"
-        print(psave.data[slices].shape)
-        psave.data[slices].tofile(filename)
+        # print(psave.data[slices].shape)
+        psave.data[:].tofile(filename)
 
 if __name__ == "__main__":
     start = time.time()

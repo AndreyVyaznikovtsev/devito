@@ -58,8 +58,7 @@ class FKFilter3D:
         
         # Apparent velocity calculation (broadcasted)
         with torch.no_grad():
-            # safe_kx = torch.where(kx == 0, torch.tensor(1e-10, device=self.device), kx)
-            safe_kx = torch.where(kz == 0, torch.tensor(1e-10, device=self.device), kz)
+            safe_kx = torch.where(kx == 0, torch.tensor(1e-10, device=self.device), kx)
 
             v_apparent = torch.abs(omega / safe_kx)  # (Z, X, T//2+1)
             
