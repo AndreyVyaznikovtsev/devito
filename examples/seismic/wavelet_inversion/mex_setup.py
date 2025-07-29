@@ -17,38 +17,46 @@ PATH_DATA = path = "../data/21-20.sgy"
 SO = 4
 NBL = 100
 
+
 # Computes the residual between observed and synthetic data into the residual
 def compute_residual(residual, dobs, dsyn):
     # A simple data difference is enough in serial
     residual.data[:] = dsyn.data[:] - dobs.T
     return residual
 
-def fwi_gradient(vp_in, model, geometry, dataset, nshots, solver):    
+
+def fwi_gradient(vp_in, model, geometry, dataset, nshots, solver):
     # Create symbols to hold the gradient
     grad = Function(name="grad", grid=model.grid)
     # Create placeholders for the data residual and data
-    residual = Receiver(name='residual', grid=model.grid,
-                        time_range=geometry.time_axis, 
-                        coordinates=geometry.rec_positions)
-    d_syn = Receiver(name='d_syn', grid=model.grid,
-                     time_range=geometry.time_axis, 
-                     coordinates=geometry.rec_positions)
-    objective = 0.
+    residual = Receiver(
+        name="residual",
+        grid=model.grid,
+        time_range=geometry.time_axis,
+        coordinates=geometry.rec_positions,
+    )
+    d_syn = Receiver(
+        name="d_syn",
+        grid=model.grid,
+        time_range=geometry.time_axis,
+        coordinates=geometry.rec_positions,
+    )
+    objective = 0.0
     for i in range(nshots):
         # Update source location
         d_obs, sx, sz, rec_x, rec_z = dataset[i]
         d_obs *= -1
         sz *= -1
-        
+
         geometry.src_positions[0, :] = np.array([sx, sz])[None, :]
 
         # Compute smooth data and full forward wavefield u0
         _, u0, _ = solver.forward(vp=vp_in, save=True, rec=d_syn)
-        
+
         compute_residual(residual, d_obs, d_syn)
-        objective += .5*norm(residual)**2
+        objective += 0.5 * norm(residual) ** 2
         solver.gradient(rec=residual, u=u0, vp=vp_in, grad=grad, checkpointing=True)
-    
+
     return objective, grad
 
 
@@ -60,17 +68,25 @@ def main():
     print(xmin, xmax)
 
     spacing = (0.1, 0.1)
-    velmodel = VelocityModel(PATH_MODEL, dx=spacing[0], dz=spacing[1], clip=True, xmin=xmin-3, xmax=xmax+3, zmin=-318)
+    velmodel = VelocityModel(
+        PATH_MODEL,
+        dx=spacing[0],
+        dz=spacing[1],
+        clip=True,
+        xmin=xmin - 3,
+        xmax=xmax + 3,
+        zmin=-318,
+    )
     velmodel.pad_left(4)
-    velmodel.pad_right(8*int(0.5/0.1))
-    velmodel.pad_bottom(10*int(0.5/0.1))
-    velmodel.pad_top(7*int(0.5/0.1))
+    velmodel.pad_right(8 * int(0.5 / 0.1))
+    velmodel.pad_bottom(10 * int(0.5 / 0.1))
+    velmodel.pad_top(7 * int(0.5 / 0.1))
 
     vp = velmodel.vp.T
     print(np.max(vp))
     print(np.min(vp))
 
-    dx_critical = 500/(10*2000)
+    dx_critical = 500 / (10 * 2000)
     print(dx_critical)
 
     # fig, axs = velmodel.plot_vp(show=False, figsize=(9, 5), dpi=100)
@@ -97,28 +113,33 @@ def main():
     dataset.dt_r = model.critical_dt
     dataset.t_max_r = tn
     dataset.resample_on()
-    
+
     d_2, sx, sz, rec_x, rec_z = dataset[0]
     rec_z *= -1
     sz *= -1
     src_pos = np.array([sx, sz])[None, :]
     rec_pos = np.vstack([rec_x, rec_z]).T
-    f0=0.4
+    f0 = 0.4
 
-    geometry =  AcquisitionGeometry(model, rec_pos, src_pos, t0, tn, f0=f0*2, src_type="Gabor")
+    geometry = AcquisitionGeometry(model, rec_pos, src_pos, t0, tn, f0=f0 * 2, src_type="Gabor")
     solver = AcousticWaveSolver(model, geometry, space_order=4)
 
     ff, update = fwi_gradient(model.vp, model, geometry, dataset, len(dataset), solver)
-    alpha = .5 / mmax(update)
+    alpha = 0.5 / mmax(update)
     plot_image(-update.data, cmap="jet")
-    plot_image(model.vp.data + alpha*update.data, cmap="jet")
+    plot_image(model.vp.data + alpha * update.data, cmap="jet")
     smooth_d, _, _ = solver.forward(vp=model.vp)
 
     fig, ax = overlay_wiggle_plot(
-        np.array(smooth_d.data[:]), d_2.T, time_axis=geometry.time_axis.time_values, xrec=rec_z, title="Original vs Processed"
+        np.array(smooth_d.data[:]),
+        d_2.T,
+        time_axis=geometry.time_axis.time_values,
+        xrec=rec_z,
+        title="Original vs Processed",
     )
     plt.savefig(f"mex/Forward + Initial.png", dpi=300, bbox_inches="tight", pad_inches=0.1)
     plt.close()
+
 
 if __name__ == "__main__":
     start = time.time()

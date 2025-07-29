@@ -12,10 +12,10 @@ def not_bcs(bc):
     return ("mask", 1) if bc == "damp" else ("damp", 0)
 
 
-@pytest.mark.parametrize('nbl, bcs', [
-    (20, ("mask", 1)), (0, ("mask", 1)),
-    (20, ("damp", 0)), (0, ("damp", 0))
-])
+@pytest.mark.parametrize(
+    "nbl, bcs",
+    [(20, ("mask", 1)), (0, ("mask", 1)), (20, ("damp", 0)), (0, ("damp", 0))],
+)
 def test_damp(nbl, bcs):
     shape = (21, 21)
     vp = np.ones(shape)
@@ -38,11 +38,11 @@ def test_damp(nbl, bcs):
     assert center == switch_bcs[1]
 
 
-@pytest.mark.parametrize('shape', [(41,), (21, 21), (11, 11, 11)])
+@pytest.mark.parametrize("shape", [(41,), (21, 21), (11, 11, 11)])
 def test_default_geom(shape):
     vp = np.ones(shape)
-    o = tuple([0]*len(shape))
-    d = tuple([10]*len(shape))
+    o = tuple([0] * len(shape))
+    d = tuple([10] * len(shape))
     model = Model(o, d, shape, 4, vp, nbl=20, dt=1)
     assert model.critical_dt == 1
 
@@ -66,11 +66,11 @@ def test_default_geom(shape):
     assert geometry.new_src(name="bonjour").name == "bonjour"
 
 
-@pytest.mark.parametrize('shape', [(41,), (21, 21), (11, 11, 11)])
+@pytest.mark.parametrize("shape", [(41,), (21, 21), (11, 11, 11)])
 def test_geom(shape):
     vp = np.ones(shape)
-    o = tuple([0]*len(shape))
-    d = tuple([10]*len(shape))
+    o = tuple([0] * len(shape))
+    d = tuple([10] * len(shape))
     model = Model(o, d, shape, 4, vp, nbl=20, dt=1)
     assert model.critical_dt == 1
 
@@ -78,8 +78,7 @@ def test_geom(shape):
     nsrc = 4
     rec_coordinates = np.ones((nrec, len(shape)))
     src_coordinates = np.ones((nsrc, len(shape)))
-    geometry = AcquisitionGeometry(model, rec_coordinates, src_coordinates,
-                                   t0=0.0, tn=250)
+    geometry = AcquisitionGeometry(model, rec_coordinates, src_coordinates, t0=0.0, tn=250)
     assert geometry.grid == model.grid
     assert geometry.nrec == nrec
     assert geometry.nsrc == nsrc

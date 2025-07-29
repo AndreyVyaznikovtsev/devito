@@ -1,7 +1,11 @@
 from devito import Function, TimeFunction
 from devito.tools import memoized_meth
-from examples.seismic.self_adjoint.operators import IsoFwdOperator, IsoAdjOperator, \
-    IsoJacobianFwdOperator, IsoJacobianAdjOperator
+from examples.seismic.self_adjoint.operators import (
+    IsoFwdOperator,
+    IsoAdjOperator,
+    IsoJacobianFwdOperator,
+    IsoJacobianAdjOperator,
+)
 
 
 class SaIsoAcousticWaveSolver:
@@ -36,6 +40,7 @@ class SaIsoAcousticWaveSolver:
     space_order: int, optional
         Order of the spatial stencil discretisation. Defaults to 8.
     """
+
     def __init__(self, model, geometry, space_order=8, **kwargs):
         self.model = model
         self.geometry = geometry
@@ -45,7 +50,7 @@ class SaIsoAcousticWaveSolver:
         self.space_order = space_order
 
         # Time step is .5 time smaller due to Q
-        self.model.dt_scale = .5
+        self.model.dt_scale = 0.5
 
         # Cache compiler options
         self._kwargs = kwargs
@@ -57,29 +62,58 @@ class SaIsoAcousticWaveSolver:
     @memoized_meth
     def op_fwd(self, save=None):
         """Cached operator for forward runs with buffered wavefield"""
-        return IsoFwdOperator(self.model, save=save, geometry=self.geometry,
-                              space_order=self.space_order, **self._kwargs)
+        return IsoFwdOperator(
+            self.model,
+            save=save,
+            geometry=self.geometry,
+            space_order=self.space_order,
+            **self._kwargs,
+        )
 
     @memoized_meth
     def op_adj(self, save=None):
         """Cached operator for adjoint runs"""
-        return IsoAdjOperator(self.model, save=save, geometry=self.geometry,
-                              space_order=self.space_order, **self._kwargs)
+        return IsoAdjOperator(
+            self.model,
+            save=save,
+            geometry=self.geometry,
+            space_order=self.space_order,
+            **self._kwargs,
+        )
 
     @memoized_meth
     def op_jacadj(self, save=True):
         """Cached operator for gradient runs"""
-        return IsoJacobianAdjOperator(self.model, save=save, geometry=self.geometry,
-                                      space_order=self.space_order, **self._kwargs)
+        return IsoJacobianAdjOperator(
+            self.model,
+            save=save,
+            geometry=self.geometry,
+            space_order=self.space_order,
+            **self._kwargs,
+        )
 
     @memoized_meth
     def op_jac(self, save=None):
         """Cached operator for born runs"""
-        return IsoJacobianFwdOperator(self.model, save=save, geometry=self.geometry,
-                                      space_order=self.space_order, **self._kwargs)
+        return IsoJacobianFwdOperator(
+            self.model,
+            save=save,
+            geometry=self.geometry,
+            space_order=self.space_order,
+            **self._kwargs,
+        )
 
-    def forward(self, src=None, rec=None, b=None, vp=None, damp=None, u=None,
-                save=None, **kwargs):
+    def forward(
+        self,
+        src=None,
+        rec=None,
+        b=None,
+        vp=None,
+        damp=None,
+        u=None,
+        save=None,
+        **kwargs,
+    ):
         """
         Forward modeling function that creates the necessary
         data objects for running a forward modeling operator.
@@ -112,20 +146,23 @@ class SaIsoAcousticWaveSolver:
         rec = rec or self.geometry.rec
 
         # Create the forward wavefield if not provided
-        u = u or TimeFunction(name='u', grid=self.model.grid,
-                              save=self.geometry.nt if save else None,
-                              time_order=2, space_order=self.space_order)
+        u = u or TimeFunction(
+            name="u",
+            grid=self.model.grid,
+            save=self.geometry.nt if save else None,
+            time_order=2,
+            space_order=self.space_order,
+        )
 
         # Pick input physical parameters
         kwargs.update(self.model.physical_params(vp=vp, damp=damp, b=b))
-        kwargs.update({'dt': kwargs.pop('dt', self.dt)})
+        kwargs.update({"dt": kwargs.pop("dt", self.dt)})
 
         # Execute operator and return wavefield and receiver data
         summary = self.op_fwd(save).apply(src=src, rec=rec, u=u, **kwargs)
         return rec, u, summary
 
-    def adjoint(self, rec, src=None, b=None, v=None, damp=None, vp=None,
-                save=None, **kwargs):
+    def adjoint(self, rec, src=None, b=None, v=None, damp=None, vp=None, save=None, **kwargs):
         """
         Adjoint modeling function that creates the necessary
         data objects for running a adjoint modeling operator.
@@ -152,22 +189,32 @@ class SaIsoAcousticWaveSolver:
         and performance summary
         """
         # Create a new adjoint source and receiver symbol
-        srca = src or self.geometry.new_src(name='srca', src_type=None)
+        srca = src or self.geometry.new_src(name="srca", src_type=None)
 
         # Create the adjoint wavefield if not provided
-        v = v or TimeFunction(name='v', grid=self.model.grid,
-                              time_order=2, space_order=self.space_order)
+        v = v or TimeFunction(name="v", grid=self.model.grid, time_order=2, space_order=self.space_order)
 
         # Pick input physical parameters
         kwargs.update(self.model.physical_params(vp=vp, damp=damp, b=b))
-        kwargs.update({'dt': kwargs.pop('dt', self.dt)})
+        kwargs.update({"dt": kwargs.pop("dt", self.dt)})
 
         # Execute operator and return wavefield and receiver data
         summary = self.op_adj(save).apply(src=srca, rec=rec, v=v, **kwargs)
         return srca, v, summary
 
-    def jacobian(self, dm, src=None, rec=None, b=None, vp=None, damp=None,
-                 u0=None, du=None, save=None, **kwargs):
+    def jacobian(
+        self,
+        dm,
+        src=None,
+        rec=None,
+        b=None,
+        vp=None,
+        damp=None,
+        u0=None,
+        du=None,
+        save=None,
+        **kwargs,
+    ):
         """
         Linearized JacobianForward modeling function that creates the necessary
         data objects for running a Jacobian forward modeling operator.
@@ -205,22 +252,24 @@ class SaIsoAcousticWaveSolver:
         rec = rec or self.geometry.rec
 
         # Create the forward wavefields u and U if not provided
-        u0 = u0 or TimeFunction(name='u0', grid=self.model.grid,
-                                save=self.geometry.nt if save else None,
-                                time_order=2, space_order=self.space_order)
-        du = du or TimeFunction(name='du', grid=self.model.grid,
-                                time_order=2, space_order=self.space_order)
+        u0 = u0 or TimeFunction(
+            name="u0",
+            grid=self.model.grid,
+            save=self.geometry.nt if save else None,
+            time_order=2,
+            space_order=self.space_order,
+        )
+        du = du or TimeFunction(name="du", grid=self.model.grid, time_order=2, space_order=self.space_order)
 
         # Pick input physical parameters
         kwargs.update(self.model.physical_params(vp=vp, damp=damp, b=b))
-        kwargs.update({'dt': kwargs.pop('dt', self.dt)})
+        kwargs.update({"dt": kwargs.pop("dt", self.dt)})
 
         # Execute operator and return wavefield and receiver data
         summary = self.op_jac(save).apply(dm=dm, u0=u0, du=du, src=src, rec=rec, **kwargs)
         return rec, u0, du, summary
 
-    def jacobian_adjoint(self, rec, u0, b=None, vp=None, damp=None,
-                         dm=None, du=None, **kwargs):
+    def jacobian_adjoint(self, rec, u0, b=None, vp=None, damp=None, dm=None, du=None, **kwargs):
         """
         Linearized JacobianForward modeling function that creates the necessary
         data objects for running a Jacobian forward modeling operator.
@@ -250,16 +299,14 @@ class SaIsoAcousticWaveSolver:
         and performance summary
         """
         # Get model perturbation Function or create
-        dm = dm or Function(name='dm', grid=self.model.grid,
-                            space_order=self.space_order)
+        dm = dm or Function(name="dm", grid=self.model.grid, space_order=self.space_order)
 
         # Create the perturbation wavefield if not provided
-        du = du or TimeFunction(name='du', grid=self.model.grid,
-                                time_order=2, space_order=self.space_order)
+        du = du or TimeFunction(name="du", grid=self.model.grid, time_order=2, space_order=self.space_order)
 
         # Pick input physical parameters
         kwargs.update(self.model.physical_params(vp=vp, damp=damp, b=b))
-        kwargs.update({'dt': kwargs.pop('dt', self.dt)})
+        kwargs.update({"dt": kwargs.pop("dt", self.dt)})
 
         # Run operator
         summary = self.op_jacadj().apply(rec=rec, dm=dm, du=du, u0=u0, **kwargs)

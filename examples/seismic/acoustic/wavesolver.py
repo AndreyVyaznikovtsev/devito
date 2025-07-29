@@ -1,9 +1,21 @@
-from devito import Function, TimeFunction, ConditionalDimension, DevitoCheckpoint, CheckpointOperator, Revolver, Grid
+from devito import (
+    Function,
+    TimeFunction,
+    ConditionalDimension,
+    DevitoCheckpoint,
+    CheckpointOperator,
+    Revolver,
+    Grid,
+)
 from devito.tools import memoized_meth
 from examples.seismic.acoustic.operators import (
-    ForwardOperator, AdjointOperator, GradientOperator, BornOperator
+    ForwardOperator,
+    AdjointOperator,
+    GradientOperator,
+    BornOperator,
 )
 import numpy as np
+
 
 class AcousticWaveSolver:
     """
@@ -23,7 +35,8 @@ class AcousticWaveSolver:
     space_order: int, optional
         Order of the spatial stencil discretisation. Defaults to 4.
     """
-    def __init__(self, model, geometry, kernel='OT2', space_order=4, **kwargs):
+
+    def __init__(self, model, geometry, kernel="OT2", space_order=4, **kwargs):
         self.model = model
         self.model._initialize_bcs(bcs="damp")
         self.geometry = geometry
@@ -39,89 +52,119 @@ class AcousticWaveSolver:
     @property
     def dt(self):
         # Time step can be \sqrt{3}=1.73 bigger with 4th order
-        if self.kernel == 'OT4':
+        if self.kernel == "OT4":
             return self.model.dtype(1.73 * self.model.critical_dt)
         return self.model.critical_dt
 
     @memoized_meth
     def op_fwd(self, save=None):
         """Cached operator for forward runs with buffered wavefield"""
-        return ForwardOperator(self.model, save=save, geometry=self.geometry,
-                               kernel=self.kernel, space_order=self.space_order,
-                               **self._kwargs)
+        return ForwardOperator(
+            self.model,
+            save=save,
+            geometry=self.geometry,
+            kernel=self.kernel,
+            space_order=self.space_order,
+            **self._kwargs,
+        )
 
     @memoized_meth
-    def op_adj(self):
+    def op_adj(self, save=None):
         """Cached operator for adjoint runs"""
-        return AdjointOperator(self.model, save=None, geometry=self.geometry,
-                               kernel=self.kernel, space_order=self.space_order,
-                               **self._kwargs)
+        return AdjointOperator(
+            self.model,
+            save=save,
+            geometry=self.geometry,
+            kernel=self.kernel,
+            space_order=self.space_order,
+            **self._kwargs,
+        )
 
     @memoized_meth
     def op_grad(self, save=True):
         """Cached operator for gradient runs"""
-        return GradientOperator(self.model, save=save, geometry=self.geometry,
-                                kernel=self.kernel, space_order=self.space_order,
-                                **self._kwargs)
+        return GradientOperator(
+            self.model,
+            save=save,
+            geometry=self.geometry,
+            kernel=self.kernel,
+            space_order=self.space_order,
+            **self._kwargs,
+        )
 
     @memoized_meth
     def op_born(self):
         """Cached operator for born runs"""
-        return BornOperator(self.model, save=None, geometry=self.geometry,
-                            kernel=self.kernel, space_order=self.space_order,
-                            **self._kwargs)
+        return BornOperator(
+            self.model,
+            save=None,
+            geometry=self.geometry,
+            kernel=self.kernel,
+            space_order=self.space_order,
+            **self._kwargs,
+        )
 
     def forward(self, src=None, rec=None, u=None, model=None, save=None, **kwargs):
         src = src or self.geometry.src
         rec = rec or self.geometry.rec
 
         # Create wavefield with main grid dimensions
-        u = u or TimeFunction(name='u', grid=self.model.grid,
-                            save=None, time_order=2,
-                            space_order=self.space_order)
+        u = u or TimeFunction(
+            name="u",
+            grid=self.model.grid,
+            save=None,
+            time_order=2,
+            space_order=self.space_order,
+        )
 
         model = model or self.model
         kwargs.update(model.physical_params(**kwargs))
 
         if save:
-            # Get explicit grid parameters
             nx, nz = model.grid.shape  # Original dimensions
-            
-            # Calculate subsampling factors
             x_subsample = 10
             z_subsample = 10
             sub_nx = nx // x_subsample + 1
             sub_nz = nz // z_subsample + 1
-            # Calculate subsampling factors
-            
 
             # Handle time subsampling
-            nsnaps = kwargs.pop('nsnaps', 500)
-            # nsnaps = 223
+            nsnaps = kwargs.pop("nsnaps", 500)
 
             time_factor = max(1, round(self.geometry.nt / nsnaps))
-            time_sub = ConditionalDimension('t_sub', parent=model.grid.time_dim, 
-                                            factor=time_factor)
-            x_sub = ConditionalDimension(name='x_sub', parent=model.grid.dimensions[0], 
-                                        factor=x_subsample)
-            z_sub = ConditionalDimension(name='z_sub', parent=model.grid.dimensions[1], 
-                                        factor=z_subsample)
-            
-            # # Create storage for subsampled wavefield
-            usave = TimeFunction(name='usave', grid=model.grid, dimensions=(time_sub, x_sub, z_sub), shape=(nsnaps, sub_nx, sub_nz), time_dim=time_sub, save=nsnaps)
+            time_sub = ConditionalDimension("t_sub", parent=model.grid.time_dim, factor=time_factor)
+            x_sub = ConditionalDimension(name="x_sub", parent=model.grid.dimensions[0], factor=x_subsample)
+            z_sub = ConditionalDimension(name="z_sub", parent=model.grid.dimensions[1], factor=z_subsample)
 
-            self._kwargs.update({'nsnaps': nsnaps, 'time_factor': time_factor,
-                                 'x_subsample': x_subsample, 'z_subsample': z_subsample})
-            
-            summary = self.op_fwd(True).apply(src=src, rec=rec,
-                                              u=u,
-                                              usave=usave,
-                                              dt=kwargs.pop('dt', self.dt), **kwargs)
+            # # Create storage for subsampled wavefield
+            usave = TimeFunction(
+                name="usave",
+                grid=model.grid,
+                dimensions=(time_sub, x_sub, z_sub),
+                shape=(nsnaps, sub_nx, sub_nz),
+                time_dim=time_sub,
+                save=nsnaps,
+            )
+
+            self._kwargs.update(
+                {
+                    "nsnaps": nsnaps,
+                    "time_factor": time_factor,
+                    "x_subsample": x_subsample,
+                    "z_subsample": z_subsample,
+                }
+            )
+
+            summary = self.op_fwd(True).apply(
+                src=src,
+                rec=rec,
+                u=u,
+                usave=usave,
+                dt=kwargs.pop("dt", self.dt),
+                **kwargs,
+            )
             return rec, u, usave, summary
         else:
-            summary = self.op_fwd(save).apply(src=src, rec=rec, u=u, 
-                                            dt=kwargs.pop('dt', self.dt), 
-                                            **kwargs)
+            summary = self.op_fwd(save).apply(src=src, rec=rec, u=u, dt=kwargs.pop("dt", self.dt), **kwargs)
             return rec, u, summary
 
     def adjoint(self, rec, srca=None, v=None, model=None, **kwargs):
@@ -149,23 +192,73 @@ class AcousticWaveSolver:
         Adjoint source, wavefield and performance summary.
         """
         # Create a new adjoint source and receiver symbol
-        srca = srca or self.geometry.new_src(name='srca', src_type=None)
+        # srca = srca or self.geometry.new_src(name="srca", src_type=None)
+        # print(srca.data[:])
 
         # Create the adjoint wavefield if not provided
-        v = v or TimeFunction(name='v', grid=self.model.grid,
-                              time_order=2, space_order=self.space_order)
-
+        v = v or TimeFunction(name="v", grid=self.model.grid, time_order=2, space_order=self.space_order)
         model = model or self.model
         # Pick vp from model unless explicitly provided
         kwargs.update(model.physical_params(**kwargs))
 
-        # Execute operator and return wavefield and receiver data
-        summary = self.op_adj().apply(srca=srca, rec=rec, v=v,
-                                      dt=kwargs.pop('dt', self.dt), **kwargs)
-        return srca, v, summary
+        save = kwargs.pop("save", False)
+        if save:
+            nx, nz = model.grid.shape  # Original dimensions
+            x_subsample = 10
+            z_subsample = 10
+            sub_nx = nx // x_subsample + 1
+            sub_nz = nz // z_subsample + 1
+            nsnaps = kwargs.pop("nsnaps", 500)
 
-    def jacobian_adjoint(self, rec, u, src=None, v=None, grad=None, model=None,
-                         checkpointing=False, **kwargs):
+            time_factor = max(1, round(self.geometry.nt / nsnaps))
+            time_sub = ConditionalDimension("t_sub", parent=model.grid.time_dim, factor=time_factor)
+            x_sub = ConditionalDimension(name="x_sub", parent=model.grid.dimensions[0], factor=x_subsample)
+            z_sub = ConditionalDimension(name="z_sub", parent=model.grid.dimensions[1], factor=z_subsample)
+
+            # # Create storage for subsampled wavefield
+            vsave = TimeFunction(
+                name="vsave",
+                grid=model.grid,
+                dimensions=(time_sub, x_sub, z_sub),
+                shape=(nsnaps, sub_nx, sub_nz),
+                time_dim=time_sub,
+                save=nsnaps,
+                time_order=2
+            )
+            self._kwargs.update(
+                {
+                    "nsnaps": nsnaps,
+                    "time_factor": time_factor,
+                    "x_subsample": x_subsample,
+                    "z_subsample": z_subsample,
+                }
+            )
+
+            summary = self.op_adj(True).apply(
+                # src=srca,
+                rec=rec,
+                v=v,
+                vsave=vsave,
+                dt=kwargs.pop("dt", self.dt),
+                **kwargs,
+            )
+            return v, vsave, summary
+        else:
+            # Execute operator and return wavefield and receiver data
+            summary = self.op_adj().apply(srca=srca, rec=rec, v=v, dt=kwargs.pop("dt", self.dt), **kwargs)
+            return srca, v, summary
+
+    def jacobian_adjoint(
+        self,
+        rec,
+        u,
+        src=None,
+        v=None,
+        grad=None,
+        model=None,
+        checkpointing=False,
+        **kwargs,
+    ):
         """
         Gradient modelling function for computing the adjoint of the
         Linearized Born modelling function, ie. the action of the
@@ -190,36 +283,41 @@ class AcousticWaveSolver:
         -------
         Gradient field and performance summary.
         """
-        dt = kwargs.pop('dt', self.dt)
+        dt = kwargs.pop("dt", self.dt)
         # Gradient symbol
-        grad = grad or Function(name='grad', grid=self.model.grid)
+        grad = grad or Function(name="grad", grid=self.model.grid)
 
         # Create the forward wavefield
-        v = v or TimeFunction(name='v', grid=self.model.grid,
-                              time_order=2, space_order=self.space_order)
+        v = v or TimeFunction(name="v", grid=self.model.grid, time_order=2, space_order=self.space_order)
 
         model = model or self.model
         # Pick vp from model unless explicitly provided
         kwargs.update(model.physical_params(**kwargs))
 
         if checkpointing:
-            u = TimeFunction(name='u', grid=self.model.grid,
-                             time_order=2, space_order=self.space_order)
+            u = TimeFunction(
+                name="u",
+                grid=self.model.grid,
+                time_order=2,
+                space_order=self.space_order,
+            )
             cp = DevitoCheckpoint([u])
             n_checkpoints = None
-            wrap_fw = CheckpointOperator(self.op_fwd(save=False),
-                                         src=src or self.geometry.src,
-                                         u=u, dt=dt, **kwargs)
-            wrap_rev = CheckpointOperator(self.op_grad(save=False), u=u, v=v,
-                                          rec=rec, dt=dt, grad=grad, **kwargs)
+            wrap_fw = CheckpointOperator(
+                self.op_fwd(save=False),
+                src=src or self.geometry.src,
+                u=u,
+                dt=dt,
+                **kwargs,
+            )
+            wrap_rev = CheckpointOperator(self.op_grad(save=False), u=u, v=v, rec=rec, dt=dt, grad=grad, **kwargs)
 
             # Run forward
-            wrp = Revolver(cp, wrap_fw, wrap_rev, n_checkpoints, rec.data.shape[0]-2)
+            wrp = Revolver(cp, wrap_fw, wrap_rev, n_checkpoints, rec.data.shape[0] - 2)
             wrp.apply_forward()
             summary = wrp.apply_reverse()
         else:
-            summary = self.op_grad().apply(rec=rec, grad=grad, v=v, u=u, dt=dt,
-                                           **kwargs)
+            summary = self.op_grad().apply(rec=rec, grad=grad, v=v, u=u, dt=dt, **kwargs)
         return grad, summary
 
     def jacobian(self, dmin, src=None, rec=None, u=None, U=None, model=None, **kwargs):
@@ -248,18 +346,15 @@ class AcousticWaveSolver:
         rec = rec or self.geometry.rec
 
         # Create the forward wavefields u and U if not provided
-        u = u or TimeFunction(name='u', grid=self.model.grid,
-                              time_order=2, space_order=self.space_order)
-        U = U or TimeFunction(name='U', grid=self.model.grid,
-                              time_order=2, space_order=self.space_order)
+        u = u or TimeFunction(name="u", grid=self.model.grid, time_order=2, space_order=self.space_order)
+        U = U or TimeFunction(name="U", grid=self.model.grid, time_order=2, space_order=self.space_order)
 
         model = model or self.model
         # Pick vp from model unless explicitly provided
         kwargs.update(model.physical_params(**kwargs))
 
         # Execute operator and return wavefield and receiver data
-        summary = self.op_born().apply(dm=dmin, u=u, U=U, src=src, rec=rec,
-                                       dt=kwargs.pop('dt', self.dt), **kwargs)
+        summary = self.op_born().apply(dm=dmin, u=u, U=U, src=src, rec=rec, dt=kwargs.pop("dt", self.dt), **kwargs)
         return rec, u, U, summary
 
     # Backward compatibility

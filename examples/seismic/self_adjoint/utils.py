@@ -1,7 +1,7 @@
 import numpy as np
 from devito import Eq, Operator, SubDimension, exp, Min, Abs
 
-__all__ = ['setup_w_over_q']
+__all__ = ["setup_w_over_q"]
 
 
 def setup_w_over_q(wOverQ, w, qmin, qmax, npad, sigma=0):
@@ -35,7 +35,7 @@ def setup_w_over_q(wOverQ, w, qmin, qmax, npad, sigma=0):
     assert qmax > 0, "supplied qmax value [%f] must be positive" % (qmax)
     assert npad > 0, "supplied npad value [%f] must be positive" % (npad)
     for n in wOverQ.grid.shape:
-        if n - 2*npad < 1:
+        if n - 2 * npad < 1:
             raise ValueError("2 * npad must not exceed dimension size!")
 
     lqmin = np.log(qmin)
@@ -46,17 +46,15 @@ def setup_w_over_q(wOverQ, w, qmin, qmax, npad, sigma=0):
     eqs = [Eq(wOverQ, 1)]
     for d in wOverQ.dimensions:
         # left
-        dim_l = SubDimension.left(name='abc_%s_l' % d.name, parent=d,
-                                  thickness=npad)
+        dim_l = SubDimension.left(name="abc_%s_l" % d.name, parent=d, thickness=npad)
         pos = Abs(dim_l - d.symbolic_min) / float(npad)
         eqs.append(Eq(wOverQ.subs({d: dim_l}), Min(wOverQ.subs({d: dim_l}), pos)))
         # right
-        dim_r = SubDimension.right(name='abc_%s_r' % d.name, parent=d,
-                                   thickness=npad)
+        dim_r = SubDimension.right(name="abc_%s_r" % d.name, parent=d, thickness=npad)
         pos = Abs(d.symbolic_max - dim_r) / float(npad)
         eqs.append(Eq(wOverQ.subs({d: dim_r}), Min(wOverQ.subs({d: dim_r}), pos)))
 
     eqs.append(Eq(wOverQ, w / exp(lqmin + wOverQ * (lqmax - lqmin))))
     # 2020.05.04 currently does not support spatial smoothing of the Q field
     # due to MPI weirdness in reassignment of the numpy array
-    Operator(eqs, name='WOverQ_Operator')()
+    Operator(eqs, name="WOverQ_Operator")()

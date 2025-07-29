@@ -23,6 +23,7 @@ class ViscoelasticWaveSolver:
     -----
     This is an experimental staggered grid viscoelastic modeling kernel.
     """
+
     def __init__(self, model, geometry, space_order=4, **kwargs):
         self.model = model
         self.model._initialize_bcs(bcs="mask")
@@ -32,7 +33,7 @@ class ViscoelasticWaveSolver:
 
         # The viscoelastic equation requires a smaller dt than the standard
         # elastic equation due to instability introduced by the viscosity.
-        self.model.dt_scale = .9
+        self.model.dt_scale = 0.9
 
         # Cache compiler options
         self._kwargs = kwargs
@@ -44,11 +45,26 @@ class ViscoelasticWaveSolver:
     @memoized_meth
     def op_fwd(self, save=None):
         """Cached operator for forward runs with buffered wavefield"""
-        return ForwardOperator(self.model, save=save, geometry=self.geometry,
-                               space_order=self.space_order, **self._kwargs)
+        return ForwardOperator(
+            self.model,
+            save=save,
+            geometry=self.geometry,
+            space_order=self.space_order,
+            **self._kwargs,
+        )
 
-    def forward(self, src=None, rec1=None, rec2=None, v=None, tau=None, r=None,
-                model=None, save=None, **kwargs):
+    def forward(
+        self,
+        src=None,
+        rec1=None,
+        rec2=None,
+        v=None,
+        tau=None,
+        r=None,
+        model=None,
+        save=None,
+        **kwargs,
+    ):
         """
         Forward modelling function that creates the necessary
         data objects for running a forward modelling operator.
@@ -88,19 +104,34 @@ class ViscoelasticWaveSolver:
         # Source term is read-only, so re-use the default
         src = src or self.geometry.src
         # Create a new receiver object to store the result
-        rec1 = rec1 or self.geometry.new_rec(name='rec1')
-        rec2 = rec2 or self.geometry.new_rec(name='rec2')
+        rec1 = rec1 or self.geometry.new_rec(name="rec1")
+        rec2 = rec2 or self.geometry.new_rec(name="rec2")
 
         # Create all the fields v, tau, r
         save_t = src.nt if save else None
-        v = v or VectorTimeFunction(name="v", grid=self.model.grid, save=save_t,
-                                    time_order=1, space_order=self.space_order)
+        v = v or VectorTimeFunction(
+            name="v",
+            grid=self.model.grid,
+            save=save_t,
+            time_order=1,
+            space_order=self.space_order,
+        )
         # Stress:
-        tau = tau or TensorTimeFunction(name='t', grid=self.model.grid, save=save_t,
-                                        space_order=self.space_order, time_order=1)
+        tau = tau or TensorTimeFunction(
+            name="t",
+            grid=self.model.grid,
+            save=save_t,
+            space_order=self.space_order,
+            time_order=1,
+        )
         # Memory variable:
-        r = r or TensorTimeFunction(name='r', grid=self.model.grid, save=save_t,
-                                    space_order=self.space_order, time_order=1)
+        r = r or TensorTimeFunction(
+            name="r",
+            grid=self.model.grid,
+            save=save_t,
+            space_order=self.space_order,
+            time_order=1,
+        )
 
         kwargs.update({k.name: k for k in v})
         kwargs.update({k.name: k for k in tau})
@@ -111,6 +142,5 @@ class ViscoelasticWaveSolver:
         kwargs.update(model.physical_params(**kwargs))
 
         # Execute operator and return wavefield and receiver data
-        summary = self.op_fwd(save).apply(src=src, rec1=rec1, rec2=rec2,
-                                          dt=kwargs.pop('dt', self.dt), **kwargs)
+        summary = self.op_fwd(save).apply(src=src, rec1=rec1, rec2=rec2, dt=kwargs.pop("dt", self.dt), **kwargs)
         return rec1, rec2, v, tau, summary

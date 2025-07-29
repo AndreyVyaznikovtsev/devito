@@ -1,6 +1,7 @@
 from functools import cached_property
 from scipy import interpolate
 import numpy as np
+
 try:
     import matplotlib.pyplot as plt
 except:
@@ -8,8 +9,16 @@ except:
 
 from devito.types import SparseTimeFunction
 
-__all__ = ['PointSource', 'Receiver', 'Shot', 'WaveletSource',
-           'RickerSource', 'GaborSource', 'DGaussSource', 'TimeAxis']
+__all__ = [
+    "PointSource",
+    "Receiver",
+    "Shot",
+    "WaveletSource",
+    "RickerSource",
+    "GaborSource",
+    "DGaussSource",
+    "TimeAxis",
+]
 
 
 class TimeAxis:
@@ -39,17 +48,18 @@ class TimeAxis:
     stop : float, optional
         End time.
     """
+
     def __init__(self, start=None, step=None, num=None, stop=None):
         try:
             if start is None:
-                start = step*(1 - num) + stop
+                start = step * (1 - num) + stop
             elif step is None:
-                step = (stop - start)/(num - 1)
+                step = (stop - start) / (num - 1)
             elif num is None:
-                num = int(np.ceil((stop - start + step)/step))
-                stop = step*(num - 1) + start
+                num = int(np.ceil((stop - start + step) / step))
+                stop = step * (num - 1) + start
             elif stop is None:
-                stop = step*(num - 1) + start
+                stop = step * (num - 1) + start
             else:
                 raise ValueError("Only three of start, step, num and stop may be set")
         except:
@@ -64,8 +74,12 @@ class TimeAxis:
         self.num = int(num)
 
     def __str__(self):
-        return "TimeAxis: start=%g, stop=%g, step=%g, num=%g" % \
-               (self.start, self.stop, self.step, self.num)
+        return "TimeAxis: start=%g, stop=%g, step=%g, num=%g" % (
+            self.start,
+            self.stop,
+            self.step,
+            self.num,
+        )
 
     def _rebuild(self):
         return TimeAxis(start=self.start, stop=self.stop, num=self.num)
@@ -102,27 +116,27 @@ class PointSource(SparseTimeFunction):
         Represents the number of points in this source.
     """
 
-    __rkwargs__ = list(SparseTimeFunction.__rkwargs__) + ['time_range']
-    __rkwargs__.remove('nt')  # `nt` is inferred from `time_range`
+    __rkwargs__ = list(SparseTimeFunction.__rkwargs__) + ["time_range"]
+    __rkwargs__.remove("nt")  # `nt` is inferred from `time_range`
 
     @classmethod
     def __args_setup__(cls, *args, **kwargs):
-        kwargs['nt'] = kwargs['time_range'].num
+        kwargs["nt"] = kwargs["time_range"].num
 
         # Either `npoint` or `coordinates` must be provided
-        npoint = kwargs.get('npoint', kwargs.get('npoint_global'))
+        npoint = kwargs.get("npoint", kwargs.get("npoint_global"))
         if npoint is None:
-            coordinates = kwargs.get('coordinates', kwargs.get('coordinates_data'))
+            coordinates = kwargs.get("coordinates", kwargs.get("coordinates_data"))
             if coordinates is None:
                 raise TypeError("Need either `npoint` or `coordinates`")
-            kwargs['npoint'] = coordinates.shape[0]
+            kwargs["npoint"] = coordinates.shape[0]
 
         return args, kwargs
 
     def __init_finalize__(self, *args, **kwargs):
-        time_range = kwargs.pop('time_range')
-        data = kwargs.pop('data', None)
-        kwargs.setdefault('time_order', 2)
+        time_range = kwargs.pop("time_range")
+        data = kwargs.pop("data", None)
+        kwargs.setdefault("time_order", 2)
         super().__init_finalize__(*args, **kwargs)
 
         self._time_range = time_range._rebuild()
@@ -163,13 +177,17 @@ class PointSource(SparseTimeFunction):
         new_traces = np.zeros((new_time_range.num, ntraces))
 
         for i in range(ntraces):
-            tck = interpolate.splrep(self._time_range.time_values,
-                                     self.data[:, i], k=order)
+            tck = interpolate.splrep(self._time_range.time_values, self.data[:, i], k=order)
             new_traces[:, i] = interpolate.splev(new_time_range.time_values, tck)
 
         # Return new object
-        return PointSource(name=self.name, grid=self.grid, data=new_traces,
-                           time_range=new_time_range, coordinates=self.coordinates.data)
+        return PointSource(
+            name=self.name,
+            grid=self.grid,
+            data=new_traces,
+            time_range=new_time_range,
+            coordinates=self.coordinates.data,
+        )
 
 
 Receiver = PointSource
@@ -177,7 +195,6 @@ Shot = PointSource
 
 
 class WaveletSource(PointSource):
-
     """
     Abstract base class for symbolic objects that encapsulates a set of
     sources with a pre-defined source signal wavelet.
@@ -198,23 +215,23 @@ class WaveletSource(PointSource):
         Firing time (defaults to 1 / f0)
     """
 
-    __rkwargs__ = PointSource.__rkwargs__ + ['f0', 'a', 't0']
+    __rkwargs__ = PointSource.__rkwargs__ + ["f0", "a", "t0"]
 
     @classmethod
     def __args_setup__(cls, *args, **kwargs):
-        kwargs.setdefault('npoint', 1)
+        kwargs.setdefault("npoint", 1)
 
         return super().__args_setup__(*args, **kwargs)
 
     def __init_finalize__(self, *args, **kwargs):
         super().__init_finalize__(*args, **kwargs)
 
-        self.f0 = kwargs.get('f0')
-        self.a = kwargs.get('a')
-        self.t0 = kwargs.get('t0')
+        self.f0 = kwargs.get("f0")
+        self.a = kwargs.get("a")
+        self.t0 = kwargs.get("t0")
 
         if not self.alias:
-            for p in range(kwargs['npoint']):
+            for p in range(kwargs["npoint"]):
                 self.data[:, p] = self.wavelet
 
     @property
@@ -222,7 +239,7 @@ class WaveletSource(PointSource):
         """
         Return a wavelet with a peak frequency ``f0`` at time ``t0``.
         """
-        raise NotImplementedError('Wavelet not defined')
+        raise NotImplementedError("Wavelet not defined")
 
     def show(self, idx=0, wavelet=None):
         """
@@ -238,14 +255,13 @@ class WaveletSource(PointSource):
         wavelet = wavelet or self.data[:, idx]
         plt.figure()
         plt.plot(self.time_values, wavelet)
-        plt.xlabel('Time (ms)')
-        plt.ylabel('Amplitude')
+        plt.xlabel("Time (ms)")
+        plt.ylabel("Amplitude")
         plt.tick_params()
         plt.show()
 
 
 class RickerSource(WaveletSource):
-
     """
     Symbolic object that encapsulates a set of sources with a
     pre-defined Ricker wavelet:
@@ -272,12 +288,11 @@ class RickerSource(WaveletSource):
     def wavelet(self):
         t0 = self.t0 or 1 / self.f0
         a = self.a or 1
-        r = (np.pi * self.f0 * (self.time_values - t0))
-        return a * (1-2.*r**2)*np.exp(-r**2)
+        r = np.pi * self.f0 * (self.time_values - t0)
+        return a * (1 - 2.0 * r**2) * np.exp(-(r**2))
 
 
 class GaborSource(WaveletSource):
-
     """
     Symbolic object that encapsulates a set of sources with a
     pre-defined Gabor wavelet:
@@ -306,11 +321,10 @@ class GaborSource(WaveletSource):
         tcut = self.t0 or 1.5 / agauss
         s = (self.time_values - tcut) * agauss
         a = self.a or 1
-        return a * np.exp(-2*s**2) * np.cos(2 * np.pi * s)
+        return a * np.exp(-2 * s**2) * np.cos(2 * np.pi * s)
 
 
 class DGaussSource(WaveletSource):
-
     """
     Symbolic object that encapsulates a set of sources with a
     pre-defined 1st derivative wavelet of a Gaussian Source.
@@ -346,5 +360,5 @@ class DGaussSource(WaveletSource):
     def wavelet(self):
         t0 = self.t0 or 1 / self.f0
         a = self.a or 1
-        time = (self.time_values - t0)
-        return -2 * a * time * np.exp(- a * time**2)
+        time = self.time_values - t0
+        return -2 * a * time * np.exp(-a * time**2)

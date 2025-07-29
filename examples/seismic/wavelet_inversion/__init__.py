@@ -1,1 +1,1 @@
-from .wiener import * #noqa
+from .wiener import *  # noqa

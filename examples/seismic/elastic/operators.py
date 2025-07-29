@@ -40,26 +40,33 @@ def ForwardOperator(model, geometry, space_order=4, save=False, **kwargs):
         indices (last three time steps). Defaults to False.
     """
 
-    v = VectorTimeFunction(name='v', grid=model.grid,
-                           save=geometry.nt if save else None,
-                           space_order=space_order, time_order=1)
-    tau = TensorTimeFunction(name='tau', grid=model.grid,
-                             save=geometry.nt if save else None,
-                             space_order=space_order, time_order=1)
+    v = VectorTimeFunction(
+        name="v",
+        grid=model.grid,
+        save=geometry.nt if save else None,
+        space_order=space_order,
+        time_order=1,
+    )
+    tau = TensorTimeFunction(
+        name="tau",
+        grid=model.grid,
+        save=geometry.nt if save else None,
+        space_order=space_order,
+        time_order=1,
+    )
 
     lam, mu, b = model.lam, model.mu, model.b
 
     # Particle velocity
     eq_v = v.dt - b * div(tau)
     # Stress
-    e = (grad(v.forward) + grad(v.forward).transpose(inner=False))
+    e = grad(v.forward) + grad(v.forward).transpose(inner=False)
     eq_tau = tau.dt - lam * diag(div(v.forward)) - mu * e
 
     u_v = Eq(v.forward, model.damp * solve(eq_v, v.forward))
     u_t = Eq(tau.forward, model.damp * solve(eq_tau, tau.forward))
 
     srcrec = src_rec(v, tau, model, geometry)
-    op = Operator([u_v] + [u_t] + srcrec, subs=model.spacing_map, name="ForwardElastic",
-                  **kwargs)
+    op = Operator([u_v] + [u_t] + srcrec, subs=model.spacing_map, name="ForwardElastic", **kwargs)
     # Substitute spacing terms to reduce flops
     return op

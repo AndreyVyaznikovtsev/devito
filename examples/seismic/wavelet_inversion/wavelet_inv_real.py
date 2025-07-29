@@ -1,7 +1,11 @@
 import time
 import numpy as np
 from matplotlib import pyplot as plt
-from examples.seismic.utils import wiener_deconvolution, taper_wavelet, estimate_centroid_frequency_gather
+from examples.seismic.utils import (
+    wiener_deconvolution,
+    taper_wavelet,
+    estimate_centroid_frequency_gather,
+)
 from examples.seismic import SeismicModel, AcquisitionGeometry
 from examples.seismic.vti import VTIWaveSolver
 from examples.seismic.plotting import plot_two_wavelets, overlay_wiggle_plot
@@ -55,7 +59,13 @@ def main():
     t0 = 0.0
 
     geometry = AcquisitionGeometry(
-        model, np.array([[origin[0], origin[1]]]).T, np.array([[origin[0], origin[1]]]).T, t0, tn, f0=f0, src_type="Gabor"
+        model,
+        np.array([[origin[0], origin[1]]]).T,
+        np.array([[origin[0], origin[1]]]).T,
+        t0,
+        tn,
+        f0=f0,
+        src_type="Gabor",
     )
     solver = VTIWaveSolver(model, geometry, space_order=SO)
     dataset.resample_on()
@@ -84,16 +94,34 @@ def main():
         wav3 = np.convolve(wav1.squeeze(), stf)[: d_1.shape[0]]
         wav3_tapered, taper = taper_wavelet(wav3, geometry.time_axis.time_values, 2 / f0, 0.5 * (2 / f0))
 
-        geometry = AcquisitionGeometry(model, rec_pos, src_pos, t0, tn, f0=f0 * 2, src_type=None, wav_data=wav3_tapered)
+        geometry = AcquisitionGeometry(
+            model,
+            rec_pos,
+            src_pos,
+            t0,
+            tn,
+            f0=f0 * 2,
+            src_type=None,
+            wav_data=wav3_tapered,
+        )
         solver = VTIWaveSolver(model, geometry, space_order=SO)
-        d_3, _, psave, _  = solver.forward(vp=model.vp, src=geometry.src, save=True, nsnaps=100)
+        d_3, _, psave, _ = solver.forward(vp=model.vp, src=geometry.src, save=True, nsnaps=100)
         print(psave.shape)
         filename = f"snaps/snaps {i+1}.bin"
         psave.data[:, nbl:-nbl, :-nbl].tofile(filename)
         fig, ax = overlay_wiggle_plot(
-            np.array(d_1.data[:]), d_2.T, time_axis=geometry.time_axis.time_values, xrec=rec_z, title="Original vs Processed"
+            np.array(d_1.data[:]),
+            d_2.T,
+            time_axis=geometry.time_axis.time_values,
+            xrec=rec_z,
+            title="Original vs Processed",
         )
-        plt.savefig(f"forward_initial/Forward + Initial {i+1}.png", dpi=300, bbox_inches="tight", pad_inches=0.1)
+        plt.savefig(
+            f"forward_initial/Forward + Initial {i+1}.png",
+            dpi=300,
+            bbox_inches="tight",
+            pad_inches=0.1,
+        )
         plt.close()
 
         fig, axs = plot_two_wavelets(geometry.time_axis.time_values, wav1, wav3_tapered, taper)
@@ -101,9 +129,18 @@ def main():
         plt.close()
 
         fig, ax = overlay_wiggle_plot(
-            np.array(d_3.data[:]), d_2.T, time_axis=geometry.time_axis.time_values, xrec=rec_z, title="Original vs Processed"
+            np.array(d_3.data[:]),
+            d_2.T,
+            time_axis=geometry.time_axis.time_values,
+            xrec=rec_z,
+            title="Original vs Processed",
         )
-        plt.savefig(f"forward_inverted/Forward + Inverted {i+1}.png", dpi=300, bbox_inches="tight", pad_inches=0.1)
+        plt.savefig(
+            f"forward_inverted/Forward + Inverted {i+1}.png",
+            dpi=300,
+            bbox_inches="tight",
+            pad_inches=0.1,
+        )
         plt.close()
 
 

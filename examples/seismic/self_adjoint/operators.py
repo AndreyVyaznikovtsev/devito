@@ -32,7 +32,7 @@ def iso_stencil(field, model, **kwargs):
     vp, b, wOverQ = model.vp, model.b, model.damp
 
     # Define time step of pressure wavefield to be updated
-    forward = kwargs.get('forward', True)
+    forward = kwargs.get("forward", True)
 
     if forward:
         field_next = field.forward
@@ -42,25 +42,35 @@ def iso_stencil(field, model, **kwargs):
         field_prev = field.forward
 
     # Get the source
-    q = kwargs.get('q', 0)
+    q = kwargs.get("q", 0)
 
     # Define the time update equation for 2d/3d
     if len(field.data.shape) == 3:
         t, x, y = field.dimensions
-        eq_time_update = (t.spacing**2 * vp**2 / b) * \
-            ((b * field.dx(x0=x+x.spacing/2)).dx(x0=x-x.spacing/2) +
-             (b * field.dy(x0=y+y.spacing/2)).dy(x0=y-y.spacing/2) + q) + \
-            (2 - t.spacing * wOverQ) * field + \
-            (t.spacing * wOverQ - 1) * field_prev
+        eq_time_update = (
+            (t.spacing**2 * vp**2 / b)
+            * (
+                (b * field.dx(x0=x + x.spacing / 2)).dx(x0=x - x.spacing / 2)
+                + (b * field.dy(x0=y + y.spacing / 2)).dy(x0=y - y.spacing / 2)
+                + q
+            )
+            + (2 - t.spacing * wOverQ) * field
+            + (t.spacing * wOverQ - 1) * field_prev
+        )
 
     else:
         t, x, y, z = field.dimensions
-        eq_time_update = (t.spacing**2 * vp**2 / b) * \
-            ((b * field.dx(x0=x+x.spacing/2)).dx(x0=x-x.spacing/2) +
-             (b * field.dy(x0=y+y.spacing/2)).dy(x0=y-y.spacing/2) +
-             (b * field.dz(x0=z+z.spacing/2)).dz(x0=z-z.spacing/2) + q) + \
-            (2 - t.spacing * wOverQ) * field + \
-            (t.spacing * wOverQ - 1) * field_prev
+        eq_time_update = (
+            (t.spacing**2 * vp**2 / b)
+            * (
+                (b * field.dx(x0=x + x.spacing / 2)).dx(x0=x - x.spacing / 2)
+                + (b * field.dy(x0=y + y.spacing / 2)).dy(x0=y - y.spacing / 2)
+                + (b * field.dz(x0=z + z.spacing / 2)).dz(x0=z - z.spacing / 2)
+                + q
+            )
+            + (2 - t.spacing * wOverQ) * field
+            + (t.spacing * wOverQ - 1) * field_prev
+        )
 
     return [Eq(field_next, eq_time_update)]
 
@@ -91,9 +101,13 @@ def IsoFwdOperator(model, geometry, space_order=8, save=False, **kwargs):
     rec = geometry.rec
     vp, b = model.vp, model.b
     # Create symbols for wavefield, source and receivers
-    u = TimeFunction(name='u', grid=model.grid,
-                     save=geometry.nt if save else None,
-                     time_order=2, space_order=space_order)
+    u = TimeFunction(
+        name="u",
+        grid=model.grid,
+        save=geometry.nt if save else None,
+        time_order=2,
+        space_order=space_order,
+    )
 
     # Time update equation
     eqn = iso_stencil(u, model, forward=True)
@@ -108,8 +122,7 @@ def IsoFwdOperator(model, geometry, space_order=8, save=False, **kwargs):
     # Substitute spacing terms to reduce flops
     spacing_map = model.spacing_map
 
-    return Operator(eqn + src_term + rec_term, subs=spacing_map,
-                    name='IsoFwdOperator', **kwargs)
+    return Operator(eqn + src_term + rec_term, subs=spacing_map, name="IsoFwdOperator", **kwargs)
 
 
 def IsoAdjOperator(model, geometry, space_order=8, save=False, **kwargs):
@@ -139,9 +152,13 @@ def IsoAdjOperator(model, geometry, space_order=8, save=False, **kwargs):
     src = geometry.src
     vp, b = model.vp, model.b
     # Create symbols for wavefield, source and receivers
-    v = TimeFunction(name='v', grid=model.grid,
-                     save=geometry.nt if save else None,
-                     time_order=2, space_order=space_order)
+    v = TimeFunction(
+        name="v",
+        grid=model.grid,
+        save=geometry.nt if save else None,
+        time_order=2,
+        space_order=space_order,
+    )
 
     # Time update equation
     eqn = iso_stencil(v, model, forward=False)
@@ -156,12 +173,10 @@ def IsoAdjOperator(model, geometry, space_order=8, save=False, **kwargs):
     # Substitute spacing terms to reduce flops
     spacing_map = model.spacing_map
 
-    return Operator(eqn + rec_term + src_term, subs=spacing_map,
-                    name='IsoAdjOperator', **kwargs)
+    return Operator(eqn + rec_term + src_term, subs=spacing_map, name="IsoAdjOperator", **kwargs)
 
 
-def IsoJacobianFwdOperator(model, geometry, space_order=8,
-                           save=False, **kwargs):
+def IsoJacobianFwdOperator(model, geometry, space_order=8, save=False, **kwargs):
     """
     Construct a linearized JacobianForward modeling Operator in a variable density
     visco- acoustic media.
@@ -187,12 +202,15 @@ def IsoJacobianFwdOperator(model, geometry, space_order=8,
     rec = geometry.rec
     vp, b, wOverQ = model.vp, model.b, model.damp
     # Create p0, dp wavefields and dm velocity perturbation field
-    u0 = TimeFunction(name="u0", grid=model.grid,
-                      save=geometry.nt if save else None,
-                      time_order=2, space_order=space_order)
+    u0 = TimeFunction(
+        name="u0",
+        grid=model.grid,
+        save=geometry.nt if save else None,
+        time_order=2,
+        space_order=space_order,
+    )
 
-    du = TimeFunction(name="du", grid=model.grid,
-                      time_order=2, space_order=space_order)
+    du = TimeFunction(name="du", grid=model.grid, time_order=2, space_order=space_order)
 
     dm = Function(name="dm", grid=model.grid, space_order=space_order)
 
@@ -204,7 +222,7 @@ def IsoJacobianFwdOperator(model, geometry, space_order=8,
     eqn1 = iso_stencil(u0, model, forward=True)
 
     # Linearized source and stencil
-    lin_src = 2 * b * dm * vp**-3 * (wOverQ * u0.dt(x0=t-t.spacing/2) + u0.dt2)
+    lin_src = 2 * b * dm * vp**-3 * (wOverQ * u0.dt(x0=t - t.spacing / 2) + u0.dt2)
     eqn2 = iso_stencil(du, model, forward=True, q=lin_src)
 
     # Construct expression to inject source values, injecting at p0(t+dt)
@@ -216,12 +234,15 @@ def IsoJacobianFwdOperator(model, geometry, space_order=8,
     # Substitute spacing terms to reduce flops
     spacing_map = model.spacing_map
 
-    return Operator(eqn1 + src_term + eqn2 + rec_term, subs=spacing_map,
-                    name='IsoJacobianFwdOperator', **kwargs)
+    return Operator(
+        eqn1 + src_term + eqn2 + rec_term,
+        subs=spacing_map,
+        name="IsoJacobianFwdOperator",
+        **kwargs,
+    )
 
 
-def IsoJacobianAdjOperator(model, geometry, space_order=8,
-                           save=True, **kwargs):
+def IsoJacobianAdjOperator(model, geometry, space_order=8, save=True, **kwargs):
     """
     Construct a linearized JacobianAdjoint modeling Operator in a variable density
     visco- acoustic media.
@@ -246,20 +267,22 @@ def IsoJacobianAdjOperator(model, geometry, space_order=8,
     rec = geometry.rec
     vp, b, wOverQ = model.vp, model.b, model.damp
     # Create p0, dp wavefields and dm velocity perturbation field
-    u0 = TimeFunction(name="u0", grid=model.grid,
-                      save=geometry.nt if save else None,
-                      time_order=2, space_order=space_order)
+    u0 = TimeFunction(
+        name="u0",
+        grid=model.grid,
+        save=geometry.nt if save else None,
+        time_order=2,
+        space_order=space_order,
+    )
 
-    du = TimeFunction(name="du", grid=model.grid,
-                      time_order=2, space_order=space_order)
+    du = TimeFunction(name="du", grid=model.grid, time_order=2, space_order=space_order)
 
     dm = Function(name="dm", grid=model.grid, space_order=space_order)
 
     # Time update equation
     t = u0.time_dim
     eqn = iso_stencil(du, model, forward=False)
-    dm_update = Eq(dm, dm +
-                   du * (2 * b * vp**-3 * (wOverQ * u0.dt(x0=t-t.spacing/2) + u0.dt2)))
+    dm_update = Eq(dm, dm + du * (2 * b * vp**-3 * (wOverQ * u0.dt(x0=t - t.spacing / 2) + u0.dt2)))
 
     # Construct expression to inject receiver values, injecting at p(t-dt)
     rec_term = rec.inject(field=du.backward, expr=rec * t.spacing**2 * vp**2 / b)
@@ -267,5 +290,9 @@ def IsoJacobianAdjOperator(model, geometry, space_order=8,
     # Substitute spacing terms to reduce flops
     spacing_map = model.spacing_map
 
-    return Operator([dm_update] + eqn + rec_term, subs=spacing_map,
-                    name='IsoJacobianAdjOperator', **kwargs)
+    return Operator(
+        [dm_update] + eqn + rec_term,
+        subs=spacing_map,
+        name="IsoJacobianAdjOperator",
+        **kwargs,
+    )

@@ -1,7 +1,7 @@
 import time
 import numpy as np
-from examples.seismic import SeismicModel, AcquisitionGeometry
-from examples.seismic.acoustic import AcousticWaveSolver, EikonalSolver
+from examples.seismic import SeismicModel, AcquisitionGeometry, Receiver
+from examples.seismic.acoustic import AcousticWaveSolver
 from examples.seismic.datasets import SeismogramDataset, VelocityModel
 from devito import info
 
@@ -55,22 +55,29 @@ def main():
     )
     t0 = 0.0
     tn = dataset._t_max
+    dataset._dt_r = model.critical_dt
+    dataset._t_max_r = tn
+    dataset.resample_on()
     f0 = 0.25
 
     for i in range(len(dataset)):
-        info(f"Inverting {i+1}-th gather wavelet")
-        _, sx, sz, rec_x, rec_z = dataset[i]
+        info(f"Backward propagating {i+1}-th gather")
+        d_obs, sx, sz, rec_x, rec_z = dataset[i]
 
         src_pos = np.array([sx, sz])[None, :]
         rec_pos = np.vstack([rec_x, rec_z]).T
         f0 = 0.3
-        wav_data = np.load(f"conventional_wavelets/{i+1}.npy")
+        
+        wav_data = np.load(f"conventional_wavelets/{i+1}.npy")*0
         geometry = AcquisitionGeometry(model, rec_pos, src_pos, t0, tn, f0=f0 * 2, src_type=None, wav_data=wav_data)
         solver = AcousticWaveSolver(model, geometry, space_order=SO)
+        rec = Receiver(name="rec", grid=geometry.grid, time_range=geometry.time_axis, npoint=geometry.nrec, coordinates=geometry.rec_positions, data=d_obs.T)
 
-        _, _, psave, _ = solver.forward(vp=model.vp, src=geometry.src, save=True, nsnaps=500)
+        _, psave, summary = solver.adjoint(vp=model.vp, rec=rec, save=True, nsnaps=500)
         print(psave.shape)
-        psave.data[:].tofile(f"forward_snaps/{i+1}.bin")
+        psave.data[:].tofile(f"backward_snaps/{i+1}.bin")
+        # srca.data[:].tofile(f"adjoint_sources/{i+1}.bin")
+
 
 
 if __name__ == "__main__":
