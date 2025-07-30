@@ -223,7 +223,6 @@ class AcousticWaveSolver:
                 shape=(nsnaps, sub_nx, sub_nz),
                 time_dim=time_sub,
                 save=nsnaps,
-                time_order=2
             )
             self._kwargs.update(
                 {

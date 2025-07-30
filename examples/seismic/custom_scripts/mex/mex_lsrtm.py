@@ -99,37 +99,12 @@ def main():
         if k == 0: # Saving the first migration using Born operator.
             image = image_up_dev
 
-    # for i in range(len(dataset)):
-    #     d_obs, sx, sz, rec_x, rec_z = dataset[i]
-
-    #     src_pos = np.array([sx, sz])[None, :]
-    #     rec_pos = np.vstack([rec_x, rec_z]).T
-    #     f0 = 0.3
-
-    #     wav_data = np.load(f"conventional_wavelets/{i+1}.npy")
-    #     geometry = AcquisitionGeometry(model, rec_pos, src_pos, t0, tn, f0=f0 * 2, src_type=None, wav_data=wav_data)
-    #     solver = AcousticWaveSolver(model, geometry, space_order=SO)
-
-    #     _, _, usave, _ = solver.forward(vp=model.vp, src=geometry.src, save=True, nsnaps=NSNAPS)
-    #     print(usave.shape)
-    #     # psave.data[:].tofile(f"forward_snaps/{i+1}.bin")
-
-    #     geometry = AcquisitionGeometry(model, rec_pos, src_pos, t0, tn, f0=f0 * 2, src_type=None, wav_data=wav_data*0)
-    #     solver = AcousticWaveSolver(model, geometry, space_order=SO)
-    #     rec = Receiver(name="rec", grid=geometry.grid, time_range=geometry.time_axis, npoint=geometry.nrec, coordinates=geometry.rec_positions, data=d_obs.T)
-
-    #     _, vsave, summary = solver.adjoint(vp=model.vp, rec=rec, save=True, nsnaps=NSNAPS)
-    #     print(vsave.shape)
-    #     # psave.data[:].tofile(f"backward_snaps/{i+1}.bin")
-
-
 def lsrtm_gradient(dm, model, dataset):
     nx, nz = model.grid.shape  # Original dimensions
     sub_nx = nx // SUBSAMPLING + 1
     sub_nz = nz // SUBSAMPLING + 1
 
 
-    
     grad_full = np.zeros((sub_nx, sub_nz), dtype=dtype)
     grad_illum = np.zeros((sub_nx, sub_nz), dtype=dtype)
     src_illum = np.zeros((sub_nx, sub_nz), dtype=dtype)
@@ -139,16 +114,17 @@ def lsrtm_gradient(dm, model, dataset):
     t0 = 0.0
     tn = dataset._t_max
     f0 = 0.3
+    _, sx, sz, rec_x, rec_z = dataset[0]
+
+    src_pos = np.array([sx, sz])[None, :]
+    rec_pos = np.vstack([rec_x, rec_z]).T
+    geometry = AcquisitionGeometry(model, rec_pos, src_pos,
+                                    t0, tn, f0=f0, src_type=None,
+                                    wav_data=np.load(f"conventional_wavelets/{i+1}.npy")*0
+                                    )
+    solver = AcousticWaveSolver(model, geometry, space_order=SO)
     for i in range(len(dataset)):
         d_obs, sx, sz, rec_x, rec_z = dataset[i]
-        src_pos = np.array([sx, sz])[None, :]
-        rec_pos = np.vstack([rec_x, rec_z]).T
-
-        geometry = AcquisitionGeometry(model, rec_pos, src_pos,
-                                       t0, tn, f0=f0, src_type=None,
-                                       wav_data=np.load(f"conventional_wavelets/{i+1}.npy")*0
-                                       )
-        solver = AcousticWaveSolver(model, geometry, space_order=SO)
 
         residual = Receiver(name='residual', grid=model.grid, time_range=geometry.time_axis,
                             coordinates=geometry.rec_positions)
@@ -159,13 +135,9 @@ def lsrtm_gradient(dm, model, dataset):
         residual.data[:] = d_syn.data[:] - d_obs.T
         u0 = snap_fromfile(f"forward_snaps/{i+1}.bin", shape=(NSNAPS, sub_nx, sub_nz))
         _, v, _ = solver.adjoint(vp=model.vp, rec=residual, save=True, nsnaps=NSNAPS)
-        print(type(v))
-        print(v.dt)
-        grad_shot = calc_grad_numpy(u0, v)
-        # grad_shot,_ = solver.gradient(rec=residual, u=u0, vp=model0.vp)
-        # replace with my own gradient
+        grad_shot = calc_grad_full_numpy(u0, v.data[:], model.critical_dt*geometry.time_axis.time_values.size/NSNAPS)
         
-        src_illum += u0**2
+        src_illum += np.sum(u0**2, axis=0)
         grad_full += grad_shot
 
         objective += .5*norm(residual)**2
@@ -174,28 +146,26 @@ def lsrtm_gradient(dm, model, dataset):
      
     return objective, grad_illum
 
-def calc_grad_numpy(u0, v):
+def calc_grad_full_numpy(u0, v_data, dt):
     """
-    Compute gradient on a subsampled grid using NumPy.
+    Pure NumPy gradient computation with finite-difference dt2.
     
     Args:
-        u0 (np.ndarray): Forward wavefield (subsampled, shape=(nt, sub_nx, sub_nz)).
-        v (TimeFunction): Adjoint wavefield (subsampled).
-        model (Model): Devito model (for grid info).
-    
+        u0 (np.ndarray): Forward wavefield (nt, nx, nz)
+        v_data (np.ndarray): Adjoint wavefield (nt, nx, nz)
+        dt (float): Time step size
+        
     Returns:
-        np.ndarray: Gradient (shape=(sub_nx, sub_nz)).
+        np.ndarray: Gradient (nx, nz)
     """
-    # --- Step 1: Compute v.dt2 using Devito (on subsampled grid) ---
-    v_dt2 = TimeFunction(name="v_dt2", grid=v.grid, time_order=2, space_order=4)
-    op = Operator([Eq(v_dt2, v.dt2.subs)])
-    op.apply()
-    v_dt2_data = v_dt2.data[:]  # Shape: (nt, sub_nx, sub_nz)
-    print(v_dt2_data.shape)
-    # --- Step 2: Compute gradient as -u0 * v.dt2 (sum over time) ---
-    grad = -np.sum(u0 * v_dt2_data, axis=0)  # Sum over time axis
-
-    return grad  # Shape: (sub_nx, sub_nz)
+    # Pad v_data with zeros at t=-1 and t=nt
+    v_padded = np.pad(v_data, ((1, 1), (0, 0), (0, 0)), mode='constant')
+    
+    # Compute second time derivative (centered FD)
+    v_dt2 = (v_padded[2:] - 2*v_padded[1:-1] + v_padded[:-2]) / (dt**2)
+    
+    # Gradient = -∑(u0 * v_dt2) over time
+    return -np.sum(u0 * v_dt2, axis=0)
 
 def snap_fromfile(path, shape, back=False):
     fobj = open(path, "rb")

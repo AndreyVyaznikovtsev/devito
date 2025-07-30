@@ -59,12 +59,6 @@ class FKFilter3D:
             lower_bound = self.min_slope * abs_fxx + self.lower_min
             upper_bound = self.max_slope * abs_fxx + self.upper_min
             mask = (fzz > lower_bound) & (fzz < upper_bound)
-            # # Create 2D mask (Z,X)
-            # pos_mask = (fzz > lower_bound) & (fzz < upper_bound) & (fxx > 0)
-            # neg_mask = (fzz < lower_bound) & (fzz > upper_bound) & (fxx < 0)
-
-            # # Combine masks (now includes both 1st and 3rd quadrants)
-            # mask = pos_mask | neg_mask
 
             # Initialize 2D filter
             buff = torch.where(mask, 1.0, 0.0)
@@ -125,13 +119,35 @@ class FKFilter3D:
         kernel = torch.exp(-(x**2) / (2 * sigma**2))
         return kernel / kernel.sum()
 
-    def __call__(self, input: np.ndarray):
-        """Process single (1, Z, X, T) or (Z, X, T) input"""
-        # Ensure correct shape (1, Z, X, T)
-        input_t = torch.as_tensor(input, device=self.device)
-        if input_t.ndim == 3:
-            input_t = input_t.unsqueeze(0)
-        _, Z, X, T = input_t.shape
+    # def __call__(self, input: np.ndarray):
+    #     """Process single (1, Z, X, T) or (Z, X, T) input"""
+    #     # Ensure correct shape (1, Z, X, T)
+    #     input_t = torch.as_tensor(input, device=self.device)
+    #     if input_t.ndim == 3:
+    #         input_t = input_t.unsqueeze(0)
+    #     _, Z, X, T = input_t.shape
+
+    #     # Initialize filter if needed
+    #     if self.current_shape != (Z, X, T):
+    #         self._compute_filter(Z, X, T)
+    #         self.current_shape = (Z, X, T)
+
+    #     # Forward FFT (real along last dim)
+    #     spectrum = fft.rfftn(input_t)
+    #     spectrum = fft.fftshift(spectrum, dim=(-3, -2))  # Shift Z,X
+
+    #     # Apply filter
+    #     spectrum = spectrum * self.filter
+
+    #     return fft.irfftn(fft.ifftshift(spectrum, dim=(-3, -2))).squeeze().cpu().numpy()  # Returns (Z, X, T) or (1, Z, X, T)
+
+
+    def __call__(self, input: torch.Tensor):
+        """Process batch of (B, Z, X, T) or single (Z, X, T) input"""
+        # Ensure correct shape (B, Z, X, T)
+        if input.ndim == 3:
+            input = input.unsqueeze(0)  # Add batch dimension if single input
+        B, Z, X, T = input.shape
 
         # Initialize filter if needed
         if self.current_shape != (Z, X, T):
@@ -139,13 +155,19 @@ class FKFilter3D:
             self.current_shape = (Z, X, T)
 
         # Forward FFT (real along last dim)
-        spectrum = fft.rfftn(input_t)
+        spectrum = fft.rfftn(input)
         spectrum = fft.fftshift(spectrum, dim=(-3, -2))  # Shift Z,X
 
-        # Apply filter
-        spectrum = spectrum * self.filter
+        # Apply filter - the filter automatically broadcasts to batch dimension
+        spectrum = spectrum * self.filter.unsqueeze(0)  # Add batch dimension to filter
 
-        return fft.irfftn(fft.ifftshift(spectrum, dim=(-3, -2))).squeeze().cpu().numpy()  # Returns (Z, X, T) or (1, Z, X, T)
+        # Inverse FFT and return
+        result = fft.irfftn(fft.ifftshift(spectrum, dim=(-3, -2)))
+        
+        # Return shape matches input shape
+        if input.ndim == 3:  # If input was (Z,X,T)
+            return result.squeeze(0).cpu()  # Return (Z,X,T)
+        return result.cpu()  # Return (B,Z,X,T)
 
     def plot_filter_slice(self, t_idx=0, lims=None):
         """Visualize filter slice"""
