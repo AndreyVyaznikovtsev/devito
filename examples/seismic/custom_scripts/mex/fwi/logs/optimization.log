@@ -1,0 +1,165 @@
+Iteration 0 - Objective: 1300.60498
+Iteration 1 - Objective: 1197.16162
+Iteration 2 - Objective: 1197.66931
+Iteration 3 - Objective: 1197.37317
+Iteration 4 - Objective: 1197.07300
+Iteration 0 - Objective: 1300.60498
+Iteration 1 - Objective: 1197.41187
+Iteration 0 - Objective: 1300.60498
+Iteration 1 - Objective: 1197.41187
+Iteration 2 - Objective: 1196.07581
+Iteration 0 - Objective: 1300.60498
+Iteration 0 - Objective: 1300.60498
+Iteration 0 - Objective: 1300.60498
+Iteration 1 - Objective: 1197.16162
+Iteration 1 - Objective: 1277.20166
+Iteration 0 - Objective: 1300.60498
+Iteration 1 - Objective: 1277.20166
+Iteration 2 - Objective: 1255.19556
+Iteration 3 - Objective: 1232.95837
+Iteration 4 - Objective: 1129.48047
+Iteration 5 - Objective: 1035.89587
+Iteration 6 - Objective: 984.40033
+Iteration 7 - Objective: 973.18860
+Iteration 8 - Objective: 918.93884
+Iteration 9 - Objective: 904.67529
+Iteration 10 - Objective: 881.99884
+Iteration 11 - Objective: 865.68256
+Iteration 12 - Objective: 843.89355
+Iteration 0 - Objective: 1300.60498
+Iteration 1 - Objective: 1173.87695
+Iteration 2 - Objective: 1066.06970
+Iteration 3 - Objective: 974.30225
+Iteration 4 - Objective: 898.47577
+Iteration 5 - Objective: 835.83966
+Iteration 6 - Objective: 783.10956
+Iteration 7 - Objective: 733.96844
+Iteration 8 - Objective: 682.01300
+Iteration 9 - Objective: 628.31067
+Iteration 10 - Objective: 577.28998
+Iteration 11 - Objective: 530.54376
+Iteration 12 - Objective: 512.60718
+Iteration 13 - Objective: 1019.07306
+Iteration 14 - Objective: 842.01044
+Iteration 15 - Objective: 740.91693
+Iteration 16 - Objective: 712.90186
+Iteration 17 - Objective: 714.30865
+Iteration 18 - Objective: 679.58130
+Iteration 19 - Objective: 684.05988
+Iteration 20 - Objective: 652.11566
+Iteration 21 - Objective: 643.10034
+Iteration 22 - Objective: 707.44940
+Iteration 23 - Objective: 637.59558
+Iteration 24 - Objective: 677.26038
+Iteration 25 - Objective: 797.75653
+Iteration 26 - Objective: 724.19946
+Iteration 27 - Objective: 674.71521
+Iteration 28 - Objective: 633.37103
+Iteration 29 - Objective: 618.24402
+Iteration 29 - Objective: 0.00000
+FWI experiment at 2025-07-31 20:55:07.603942, recon - 0, inv - 1
+FWI experiment at 2025-07-31 20:56:10.881978, recon - 0, inv - 1
+FWI experiment at 2025-07-31 20:57:41.740221, recon - 0, inv - 1
+FWI experiment at 2025-07-31 21:23:18.140697, recon - 0, inv - 1
+FWI experiment at 2025-07-31 21:24:02.167179, recon - 0, inv - 1
+FWI experiment at 2025-07-31 21:29:17.529470, recon - 0, inv - 1
+FWI experiment at 2025-07-31 21:30:02.894313, recon - 0, inv - 1
+FWI experiment at 2025-07-31 21:34:39.764977, recon - 0, inv - 1
+Iteration 0 - Objective: 13030.73828
+FWI experiment at 2025-07-31 21:53:40.924348, recon - 0, inv - 1
+Iteration 0 - Objective: 13030.73828
+FWI experiment at 2025-07-31 22:05:50.538220, recon - 0, inv - 1
+FWI experiment at 2025-07-31 22:13:58.758261, recon - 0, inv - 1
+Iteration 0 - Objective: 13030.73828
+FWI experiment at 2025-07-31 22:26:06.606784, recon - 0, inv - 1
+Iteration 1 - Objective: 10859.73242
+FWI experiment at 2025-07-31 22:38:22.534810, recon - 0, inv - 1
+Iteration 2 - Objective: 9807.36621
+FWI experiment at 2025-07-31 22:50:38.214949, recon - 0, inv - 1
+FWI experiment at 2025-07-31 22:58:04.766282, recon - 0, inv - 1
+Iteration 0 - Objective: 13030.73828
+FWI experiment at 2025-07-31 23:10:15.655025, recon - 0, inv - 1
+Iteration 1 - Objective: 10859.73242
+FWI experiment at 2025-07-31 23:22:41.360797, recon - 0, inv - 1
+Iteration 2 - Objective: 9807.36621
+FWI experiment at 2025-07-31 23:34:59.139468, recon - 0, inv - 1
+Iteration 3 - Objective: 9143.09961
+FWI experiment at 2025-07-31 23:47:20.264968, recon - 0, inv - 1
+Iteration 4 - Objective: 8658.34863
+FWI experiment at 2025-07-31 23:59:39.757746, recon - 0, inv - 1
+Iteration 5 - Objective: 8303.07617
+FWI experiment at 2025-08-01 00:12:05.271148, recon - 0, inv - 1
+Iteration 6 - Objective: 8061.93799
+FWI experiment at 2025-08-01 00:24:32.873440, recon - 0, inv - 1
+Iteration 7 - Objective: 8158.08105
+FWI experiment at 2025-08-01 00:36:50.135842, recon - 0, inv - 1
+Iteration 8 - Objective: 7754.35986
+FWI experiment at 2025-08-01 00:49:14.104024, recon - 0, inv - 1
+Iteration 9 - Objective: 7637.38379
+FWI experiment at 2025-08-01 01:01:27.225200, recon - 0, inv - 1
+Iteration 10 - Objective: 7378.39600
+FWI experiment at 2025-08-01 01:13:44.278842, recon - 0, inv - 1
+Iteration 11 - Objective: 7282.45117
+FWI experiment at 2025-08-01 01:25:58.179944, recon - 0, inv - 1
+Iteration 12 - Objective: 7378.68799
+FWI experiment at 2025-08-01 01:38:12.644037, recon - 0, inv - 1
+Iteration 13 - Objective: 7105.46289
+FWI experiment at 2025-08-01 01:50:27.024564, recon - 0, inv - 1
+Iteration 14 - Objective: 7027.20117
+FWI experiment at 2025-08-01 02:02:41.870346, recon - 0, inv - 1
+Iteration 15 - Objective: 7070.06299
+FWI experiment at 2025-08-01 02:14:54.165789, recon - 0, inv - 1
+Iteration 16 - Objective: 6924.63232
+FWI experiment at 2025-08-01 02:27:09.302927, recon - 0, inv - 1
+Iteration 17 - Objective: 6887.71777
+FWI experiment at 2025-08-01 02:39:25.906929, recon - 0, inv - 1
+Iteration 18 - Objective: 6862.97363
+FWI experiment at 2025-08-01 02:51:40.435543, recon - 0, inv - 1
+Iteration 19 - Objective: 6781.57422
+FWI experiment at 2025-08-01 03:03:52.162017, recon - 0, inv - 1
+Iteration 20 - Objective: 6796.46631
+FWI experiment at 2025-08-01 03:16:12.489552, recon - 0, inv - 1
+Iteration 21 - Objective: 6726.78369
+FWI experiment at 2025-08-01 03:28:26.134325, recon - 0, inv - 1
+Iteration 22 - Objective: 6779.01367
+FWI experiment at 2025-08-01 03:40:42.963288, recon - 0, inv - 1
+Iteration 23 - Objective: 6712.98389
+FWI experiment at 2025-08-01 03:52:53.881863, recon - 0, inv - 1
+Iteration 24 - Objective: 6679.28418
+FWI experiment at 2025-08-01 04:05:32.558420, recon - 0, inv - 1
+Iteration 25 - Objective: 6678.41943
+FWI experiment at 2025-08-01 04:18:08.099709, recon - 0, inv - 1
+Iteration 26 - Objective: 6644.79590
+FWI experiment at 2025-08-01 04:30:30.202244, recon - 0, inv - 1
+Iteration 27 - Objective: 6637.21924
+FWI experiment at 2025-08-01 04:42:56.388413, recon - 0, inv - 1
+Iteration 28 - Objective: 6615.39160
+FWI experiment at 2025-08-01 04:55:24.593369, recon - 0, inv - 1
+Iteration 29 - Objective: 6621.93115
+FWI experiment at 2025-08-01 08:52:02.559418, recon - 1, inv - 0
+Iteration 29 - Objective: 0.00000
+FWI experiment at 2025-08-01 09:17:47.059587, recon - 0, inv - 1
+Iteration 0 - Objective: 13558.19141
+Iteration 1 - Objective: 11249.01562
+Iteration 2 - Objective: 9778.62891
+Iteration 3 - Objective: 8769.33594
+Iteration 4 - Objective: 8103.29395
+Iteration 5 - Objective: 7643.13281
+Iteration 6 - Objective: 7381.95557
+Iteration 7 - Objective: 7387.77002
+Iteration 8 - Objective: 7757.76855
+Iteration 9 - Objective: 7404.99854
+Iteration 10 - Objective: 8661.62305
+Iteration 11 - Objective: 7693.09717
+Iteration 12 - Objective: 7267.91943
+Iteration 13 - Objective: 7143.37793
+Iteration 14 - Objective: 7043.31787
+Iteration 15 - Objective: 6952.52441
+Iteration 16 - Objective: 6838.73047
+Iteration 17 - Objective: 6704.89648
+Iteration 18 - Objective: 6629.30664
+Iteration 19 - Objective: 6747.21826
+Iteration 20 - Objective: 7207.21826
+Iteration 21 - Objective: 6755.81104
+Iteration 22 - Objective: 6670.94873
+Iteration 23 - Objective: 6707.69189

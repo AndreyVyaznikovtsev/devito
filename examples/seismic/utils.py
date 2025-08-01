@@ -361,16 +361,24 @@ class AcquisitionGeometry(Pickable):
         coords = coordinates or self.src_positions
         if self.src_type is None or src_type is None:
             warning("No source type defined, returning uninitiallized (zero) source")
-            src = PointSource(
-                name=name,
-                grid=self.grid,
-                time_range=self.time_axis,
-                npoint=self.nsrc,
-                coordinates=coords,
-                interpolation=self.interpolation,
-                r=self._r,
-                data=self.wav_data.reshape(-1, 1),
-            )
+            # Prepare common arguments
+            src_args = {
+                "name": name,
+                "grid": self.grid,
+                "time_range": self.time_axis,
+                "npoint": self.nsrc,
+                "coordinates": coords,
+                "interpolation": self.interpolation,
+                "r": self._r
+            }
+            
+            # Add wav_data if it exists
+            if self.wav_data is not None:
+                src_args["data"] = self.wav_data.reshape(-1, 1)
+            else:
+                warning("No source type defined, returning uninitialized (zero) source")
+            
+            src = PointSource(**src_args)
         else:
             src = sources[self.src_type](
                 name=name,

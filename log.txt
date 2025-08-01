@@ -1,0 +1,309 @@
+Starting forward wavefield computation...
+Starting iteration 0
+Computing adjoint wavefields for iteration 0...
+[1mCurrent objective - 78317.85938[0m
+[1mCurrent objective - 408606.93750[0m
+[1mCurrent objective - 1016641.62500[0m
+[1mCurrent objective - 2228681.50000[0m
+[1mCurrent objective - 2764014.75000[0m
+[1mCurrent objective - 3419486.00000[0m
+[1mCurrent objective - 4622225.00000[0m
+[1mCurrent objective - 5245915.00000[0m
+[1mCurrent objective - 6180079.00000[0m
+[1mCurrent objective - 7578042.50000[0m
+[1mCurrent objective - 9254994.00000[0m
+[1mCurrent objective - 11892342.00000[0m
+[1mCurrent objective - 12557792.00000[0m
+[1mCurrent objective - 13235978.00000[0m
+[1mCurrent objective - 13788875.00000[0m
+[1mCurrent objective - 14396955.00000[0m
+[1mCurrent objective - 15002926.00000[0m
+[1mCurrent objective - 15551155.00000[0m
+[1mCurrent objective - 16247110.00000[0m
+[1mCurrent objective - 16909252.00000[0m
+[1mCurrent objective - 17379848.00000[0m
+[1mCurrent objective - 17884778.00000[0m
+[1mCurrent objective - 18581866.00000[0m
+[1mCurrent objective - 19128288.00000[0m
+[1mCurrent objective - 19593688.00000[0m
+[1mCurrent objective - 20292398.00000[0m
+[1mCurrent objective - 21075168.00000[0m
+[1mCurrent objective - 21873316.00000[0m
+[1mCurrent objective - 22844580.00000[0m
+[1mCurrent objective - 23830594.00000[0m
+[1mCurrent objective - 24548826.00000[0m
+[1mCurrent objective - 24970666.00000[0m
+[1mCurrent objective - 25548554.00000[0m
+[1mCurrent objective - 26282804.00000[0m
+[1mCurrent objective - 26896120.00000[0m
+[1mCurrent objective - 27897556.00000[0m
+[1mCurrent objective - 28567410.00000[0m
+[1mCurrent objective - 28863010.00000[0m
+[1mCurrent objective - 29186142.00000[0m
+[1mCurrent objective - 29378630.00000[0m
+[1mCurrent objective - 29559866.00000[0m
+[1mCurrent objective - 29712136.00000[0m
+[1mCurrent objective - 29851160.00000[0m
+[1mCurrent objective - 29986234.00000[0m
+[1mCurrent objective - 30171282.00000[0m
+[1mCurrent objective - 30531948.00000[0m
+[1mCurrent objective - 30802988.00000[0m
+[1mCurrent objective - 31167130.00000[0m
+[1mCurrent objective - 31775882.00000[0m
+[1mCurrent objective - 32160914.00000[0m
+[1mCurrent objective - 32480744.00000[0m
+[1mCurrent objective - 32850016.00000[0m
+[1mCurrent objective - 34019128.00000[0m
+[1mCurrent objective - 35741404.00000[0m
+[1mCurrent objective - 36974884.00000[0m
+[1mCurrent objective - 38194032.00000[0m
+[1mCurrent objective - 39068248.00000[0m
+[1mCurrent objective - 40151344.00000[0m
+[1mCurrent objective - 40362480.00000[0m
+[1mIteration 1 - Objective: 40362480.00000[0m
+Computing gradients for iteration 0...
+Computing gradient for shots 1-10/59
+Computing gradient for shots 11-20/59
+Computing gradient for shots 21-30/59
+Computing gradient for shots 31-40/59
+Computing gradient for shots 41-50/59
+Computing gradient for shots 51-59/59
+Gradient computation completed in 59.36 seconds
+Updating image for iteration 0...
+(2630, 3640)
+Iteration 0 completed in 0.92 seconds
+Starting iteration 1
+Computing adjoint wavefields for iteration 1...
+[1mCurrent objective - 78427.35938[0m
+[1mCurrent objective - 408724.93750[0m
+[1mCurrent objective - 1016875.25000[0m
+[1mCurrent objective - 2233740.50000[0m
+[1mCurrent objective - 2768922.00000[0m
+[1mCurrent objective - 3426902.00000[0m
+[1mCurrent objective - 4641107.00000[0m
+[1mCurrent objective - 5271705.50000[0m
+[1mCurrent objective - 6211429.00000[0m
+[1mCurrent objective - 7622938.50000[0m
+[1mCurrent objective - 9303601.00000[0m
+[1mCurrent objective - 11963116.00000[0m
+[1mCurrent objective - 12630285.00000[0m
+[1mCurrent objective - 13310178.00000[0m
+[1mCurrent objective - 13864772.00000[0m
+[1mCurrent objective - 14475067.00000[0m
+[1mCurrent objective - 15083917.00000[0m
+[1mCurrent objective - 15634201.00000[0m
+[1mCurrent objective - 16326189.00000[0m
+[1mCurrent objective - 16985646.00000[0m
+[1mCurrent objective - 17452552.00000[0m
+[1mCurrent objective - 17950734.00000[0m
+[1mCurrent objective - 18628328.00000[0m
+[1mCurrent objective - 19162178.00000[0m
+[1mCurrent objective - 19608506.00000[0m
+[1mCurrent objective - 20277150.00000[0m
+[1mCurrent objective - 21030612.00000[0m
+[1mCurrent objective - 21816884.00000[0m
+[1mCurrent objective - 22752410.00000[0m
+[1mCurrent objective - 23703802.00000[0m
+[1mCurrent objective - 24398534.00000[0m
+[1mCurrent objective - 24816576.00000[0m
+[1mCurrent objective - 25389210.00000[0m
+[1mCurrent objective - 26108934.00000[0m
+[1mCurrent objective - 26709032.00000[0m
+[1mCurrent objective - 27672274.00000[0m
+[1mCurrent objective - 28326336.00000[0m
+[1mCurrent objective - 28629538.00000[0m
+[1mCurrent objective - 28954274.00000[0m
+[1mCurrent objective - 29150668.00000[0m
+[1mCurrent objective - 29334866.00000[0m
+[1mCurrent objective - 29486602.00000[0m
+[1mCurrent objective - 29623442.00000[0m
+[1mCurrent objective - 29759478.00000[0m
+[1mCurrent objective - 29947798.00000[0m
+[1mCurrent objective - 30313114.00000[0m
+[1mCurrent objective - 30575694.00000[0m
+[1mCurrent objective - 30929132.00000[0m
+[1mCurrent objective - 31496670.00000[0m
+[1mCurrent objective - 31882992.00000[0m
+[1mCurrent objective - 32200942.00000[0m
+[1mCurrent objective - 32580346.00000[0m
+[1mCurrent objective - 33645024.00000[0m
+[1mCurrent objective - 35186776.00000[0m
+[1mCurrent objective - 36409144.00000[0m
+[1mCurrent objective - 37583080.00000[0m
+[1mCurrent objective - 38467960.00000[0m
+[1mCurrent objective - 39542556.00000[0m
+[1mCurrent objective - 39754832.00000[0m
+[1mIteration 2 - Objective: 39754832.00000[0m
+Computing gradients for iteration 1...
+Computing gradient for shots 1-10/59
+Computing gradient for shots 11-20/59
+Computing gradient for shots 21-30/59
+Computing gradient for shots 31-40/59
+Computing gradient for shots 41-50/59
+Computing gradient for shots 51-59/59
+Gradient computation completed in 58.73 seconds
+Updating image for iteration 1...
+(2630, 3640)
+Iteration 1 completed in 1.63 seconds
+Starting iteration 2
+Computing adjoint wavefields for iteration 2...
+[1mCurrent objective - 78445.16406[0m
+[1mCurrent objective - 408695.18750[0m
+[1mCurrent objective - 1016019.75000[0m
+[1mCurrent objective - 2230674.00000[0m
+[1mCurrent objective - 2765176.75000[0m
+[1mCurrent objective - 3422051.25000[0m
+[1mCurrent objective - 4630705.50000[0m
+[1mCurrent objective - 5257844.00000[0m
+[1mCurrent objective - 6193779.50000[0m
+[1mCurrent objective - 7599459.00000[0m
+[1mCurrent objective - 9275059.00000[0m
+[1mCurrent objective - 11925245.00000[0m
+[1mCurrent objective - 12592100.00000[0m
+[1mCurrent objective - 13271934.00000[0m
+[1mCurrent objective - 13826162.00000[0m
+[1mCurrent objective - 14435540.00000[0m
+[1mCurrent objective - 15042050.00000[0m
+[1mCurrent objective - 15590359.00000[0m
+[1mCurrent objective - 16281410.00000[0m
+[1mCurrent objective - 16940280.00000[0m
+[1mCurrent objective - 17406468.00000[0m
+[1mCurrent objective - 17905002.00000[0m
+[1mCurrent objective - 18585140.00000[0m
+[1mCurrent objective - 19118548.00000[0m
+[1mCurrent objective - 19567260.00000[0m
+[1mCurrent objective - 20240626.00000[0m
+[1mCurrent objective - 20996662.00000[0m
+[1mCurrent objective - 21780402.00000[0m
+[1mCurrent objective - 22720596.00000[0m
+[1mCurrent objective - 23674478.00000[0m
+[1mCurrent objective - 24368866.00000[0m
+[1mCurrent objective - 24785190.00000[0m
+[1mCurrent objective - 25356878.00000[0m
+[1mCurrent objective - 26077214.00000[0m
+[1mCurrent objective - 26679394.00000[0m
+[1mCurrent objective - 27646672.00000[0m
+[1mCurrent objective - 28300442.00000[0m
+[1mCurrent objective - 28598868.00000[0m
+[1mCurrent objective - 28921828.00000[0m
+[1mCurrent objective - 29116870.00000[0m
+[1mCurrent objective - 29298348.00000[0m
+[1mCurrent objective - 29448940.00000[0m
+[1mCurrent objective - 29585666.00000[0m
+[1mCurrent objective - 29721334.00000[0m
+[1mCurrent objective - 29908118.00000[0m
+[1mCurrent objective - 30270944.00000[0m
+[1mCurrent objective - 30536510.00000[0m
+[1mCurrent objective - 30887638.00000[0m
+[1mCurrent objective - 31468748.00000[0m
+[1mCurrent objective - 31853400.00000[0m
+[1mCurrent objective - 32172900.00000[0m
+[1mCurrent objective - 32541556.00000[0m
+[1mCurrent objective - 33681020.00000[0m
+[1mCurrent objective - 35379512.00000[0m
+[1mCurrent objective - 36590452.00000[0m
+[1mCurrent objective - 37768072.00000[0m
+[1mCurrent objective - 38630780.00000[0m
+[1mCurrent objective - 39719568.00000[0m
+[1mCurrent objective - 39935192.00000[0m
+[1mIteration 3 - Objective: 39935192.00000[0m
+Computing gradients for iteration 2...
+Computing gradient for shots 1-10/59
+Computing gradient for shots 11-20/59
+Computing gradient for shots 21-30/59
+Computing gradient for shots 31-40/59
+Computing gradient for shots 41-50/59
+Computing gradient for shots 51-59/59
+Gradient computation completed in 48.91 seconds
+Updating image for iteration 2...
+(2630, 3640)
+Iteration 2 completed in 1.72 seconds
+Starting iteration 3
+Computing adjoint wavefields for iteration 3...
+[1mCurrent objective - 78617.63281[0m
+[1mCurrent objective - 409354.06250[0m
+[1mCurrent objective - 1018401.50000[0m
+[1mCurrent objective - 2240440.50000[0m
+[1mCurrent objective - 2777500.00000[0m
+[1mCurrent objective - 3442421.00000[0m
+[1mCurrent objective - 4680989.00000[0m
+[1mCurrent objective - 5323644.50000[0m
+[1mCurrent objective - 6277077.00000[0m
+[1mCurrent objective - 7718650.50000[0m
+[1mCurrent objective - 9416537.00000[0m
+[1mCurrent objective - 12117664.00000[0m
+[1mCurrent objective - 12789778.00000[0m
+[1mCurrent objective - 13474056.00000[0m
+[1mCurrent objective - 14032091.00000[0m
+[1mCurrent objective - 14646131.00000[0m
+[1mCurrent objective - 15259794.00000[0m
+[1mCurrent objective - 15814652.00000[0m
+[1mCurrent objective - 16508047.00000[0m
+[1mCurrent objective - 17171174.00000[0m
+[1mCurrent objective - 17638704.00000[0m
+[1mCurrent objective - 18137620.00000[0m
+[1mCurrent objective - 18809974.00000[0m
+[1mCurrent objective - 19342652.00000[0m
+[1mCurrent objective - 19781494.00000[0m
+[1mCurrent objective - 20436432.00000[0m
+[1mCurrent objective - 21175868.00000[0m
+[1mCurrent objective - 21962040.00000[0m
+[1mCurrent objective - 22882978.00000[0m
+[1mCurrent objective - 23820028.00000[0m
+[1mCurrent objective - 24505488.00000[0m
+[1mCurrent objective - 24925184.00000[0m
+[1mCurrent objective - 25501362.00000[0m
+[1mCurrent objective - 26220990.00000[0m
+[1mCurrent objective - 26820116.00000[0m
+[1mCurrent objective - 27767926.00000[0m
+[1mCurrent objective - 28421066.00000[0m
+[1mCurrent objective - 28734608.00000[0m
+[1mCurrent objective - 29068956.00000[0m
+[1mCurrent objective - 29272606.00000[0m
+[1mCurrent objective - 29462738.00000[0m
+[1mCurrent objective - 29616736.00000[0m
+[1mCurrent objective - 29753878.00000[0m
+[1mCurrent objective - 29893088.00000[0m
+[1mCurrent objective - 30088848.00000[0m
+[1mCurrent objective - 30465546.00000[0m
+[1mCurrent objective - 30729758.00000[0m
+[1mCurrent objective - 31096144.00000[0m
+[1mCurrent objective - 31668936.00000[0m
+[1mCurrent objective - 32069418.00000[0m
+[1mCurrent objective - 32393446.00000[0m
+[1mCurrent objective - 32806792.00000[0m
+[1mCurrent objective - 33921508.00000[0m
+[1mCurrent objective - 35789592.00000[0m
+[1mCurrent objective - 37381880.00000[0m
+[1mCurrent objective - 38732048.00000[0m
+[1mCurrent objective - 39674016.00000[0m
+[1mCurrent objective - 40764828.00000[0m
+[1mCurrent objective - 40983200.00000[0m
+[1mIteration 4 - Objective: 40983200.00000[0m
+Computing gradients for iteration 3...
+Computing gradient for shots 1-10/59
+Computing gradient for shots 11-20/59
+Computing gradient for shots 21-30/59
+Computing gradient for shots 31-40/59
+Computing gradient for shots 41-50/59
+Computing gradient for shots 51-59/59
+Gradient computation completed in 46.27 seconds
+Updating image for iteration 3...
+(2630, 3640)
+Iteration 3 completed in 1.91 seconds
+Starting iteration 4
+Computing adjoint wavefields for iteration 4...
+[1mCurrent objective - 78592.67969[0m
+[1mCurrent objective - 408943.37500[0m
+[1mCurrent objective - 1015426.18750[0m
+[1mCurrent objective - 2231444.50000[0m
+[1mCurrent objective - 2766153.00000[0m
+[1mCurrent objective - 3426330.50000[0m
+[1mCurrent objective - 4644164.50000[0m
+[1mCurrent objective - 5275881.00000[0m
+[1mCurrent objective - 6216253.50000[0m
+[1mCurrent objective - 7634615.50000[0m
+[1mCurrent objective - 9315042.00000[0m
+[1mCurrent objective - 11980522.00000[0m
+[1mCurrent objective - 12650523.00000[0m
+[1mCurrent objective - 13333037.00000[0m

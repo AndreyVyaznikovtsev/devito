@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from IPython.display import HTML
 import matplotlib.animation as animation
 from scipy import signal
-
+from scipy.interpolate import interp1d
 
 class SeismogramDataset:
     """
@@ -172,15 +172,15 @@ class SeismogramDataset:
 
             # Create new time axis
             new_time = np.linspace(0, self._t_max_r, num_samples)
+            old_time = np.linspace(0, self._t_max, gather.shape[1])
 
             # Resample each trace
             resampled_gather = np.zeros((gather.shape[0], num_samples))
             for i in range(gather.shape[0]):
-                # Get only the resampled values (first element of the tuple)
-                resampled_trace = signal.resample(gather[i], num_samples, t=new_time)[
-                    0
-                ]  # Take only the resampled values, ignore the time array
-                resampled_gather[i] = resampled_trace
+                # Use interpolation for more reliable resampling
+                interp_func = interp1d(old_time, gather[i], kind='linear', 
+                                    bounds_error=False, fill_value=0.0)
+                resampled_gather[i] = interp_func(new_time)
 
             gather = resampled_gather
 

@@ -1,14 +1,4 @@
-from devito import (
-    Eq,
-    Operator,
-    Function,
-    TimeFunction,
-    Inc,
-    solve,
-    sign,
-    ConditionalDimension,
-    Grid,
-)
+from devito import Eq, Operator, Function, TimeFunction, Inc, solve, sign, ConditionalDimension, exp, Dimension
 from devito.symbolics import retrieve_functions, INT, retrieve_derivatives
 from math import floor
 import numpy as np
@@ -120,56 +110,39 @@ def iso_stencil(field, model, kernel, **kwargs):
 
 
 def ForwardOperator(model, geometry, space_order=4, save=False, kernel="OT2", **kwargs):
-    m = model.m
-
-    # Create symbols for forward wavefield, source and receivers
     u = TimeFunction(name="u", grid=model.grid, save=None, time_order=2, space_order=space_order)
     src = geometry.src
     rec = geometry.rec
 
+    # Create wave equation stencils
     s = model.grid.stepping_dim.spacing
     stencils = iso_stencil(u, model, kernel)
-
-    # Construct expression to inject source values
-    stencils += src.inject(field=u.forward, expr=src * s**2 / m)
+    stencils += src.inject(field=u.forward, expr=src * s**2 / model.m)
     stencils += rec.interpolate(expr=u)
 
-    nsnaps = kwargs.pop("nsnaps", 1)
-    time_factor = kwargs.pop("time_factor", round(geometry.nt / nsnaps))
-    time_sub = ConditionalDimension(name="t_sub", parent=model.grid.time_dim, factor=time_factor)
+    # Handle subsampling if requested
+    if kwargs.get("save", False):
+        nsnaps = kwargs.pop("nsnaps", 1)
+        space_subsample = kwargs.pop("space_subsample", (1, 1))
+        time_subsample = kwargs.pop("time_subsample", round(geometry.nt / nsnaps))
 
-    x_subsample = kwargs.pop("x_subsample", 1)
-    z_subsample = kwargs.pop("z_subsample", 1)
+        x_sub = ConditionalDimension("x_sub", parent=model.grid.dimensions[0], factor=space_subsample[0])
+        z_sub = ConditionalDimension("z_sub", parent=model.grid.dimensions[1], factor=space_subsample[1])
+        time_sub = ConditionalDimension("t_sub", parent=model.grid.time_dim, factor=time_subsample)
 
-    nx, nz = model.grid.shape  # Original dimensions
+        usave = TimeFunction(
+            name="usave",
+            grid=model.grid,
+            dimensions=(time_sub, x_sub, z_sub),
+            time_dim=time_sub,
+            save=nsnaps,
+        )
+        stencils += [Eq(usave, u)]
 
-    sub_nx = nx // x_subsample + 1
-    sub_nz = nz // z_subsample + 1
-
-    x_sub = ConditionalDimension(name="x_sub", parent=model.grid.dimensions[0], factor=x_subsample)
-    z_sub = ConditionalDimension(name="z_sub", parent=model.grid.dimensions[1], factor=z_subsample)
-
-    usave = TimeFunction(
-        name="usave",
-        grid=model.grid,
-        dimensions=(time_sub, x_sub, z_sub),
-        shape=(nsnaps, sub_nx, sub_nz),
-        time_dim=time_sub,
-        save=nsnaps,
-    )
-
-    stencils += [Eq(usave, u)]
-
-    return Operator(
-        stencils,
-        subs=model.spacing_map,
-        name="Forward",
-        opt=("advanced", {"gpu-fit": usave}),
-        **kwargs,
-    )
+    return Operator(stencils, subs=model.spacing_map, name="Forward", opt=("advanced", {"gpu-fit": usave if kwargs.get("save") else None}), **kwargs)
 
 
-def AdjointOperator(model, geometry, space_order=4, kernel="OT2", **kwargs):
+def AdjointOperator(model, geometry, save=None, space_order=4, kernel="OT2", **kwargs):
     """
     Construct an adjoint modelling operator in an acoustic media.
 
@@ -185,50 +158,36 @@ def AdjointOperator(model, geometry, space_order=4, kernel="OT2", **kwargs):
     kernel : str, optional
         Type of discretization, 'OT2' or 'OT4'.
     """
-    m = model.m
-
     v = TimeFunction(name="v", grid=model.grid, save=None, time_order=2, space_order=space_order)
-    # srca = geometry.new_src(name="srca", src_type=None)
+    srca = geometry.new_src(name="srca", src_type=None)
     rec = geometry.rec
 
+    # Create wave equation stencils
     s = model.grid.stepping_dim.spacing
     stencils = iso_stencil(v, model, kernel, forward=False)
+    stencils += rec.inject(field=v.backward, expr=rec * s**2 / model.m)
+    stencils += srca.interpolate(expr=v)
 
-    stencils += rec.inject(field=v.backward, expr=rec * s**2 / m)
+    # Handle subsampling if requested
+    if save:
+        nsnaps = kwargs.pop("nsnaps", 1)
+        space_subsample = kwargs.pop("space_subsample", (1, 1))
+        time_subsample = kwargs.pop("time_subsample", round(geometry.nt / nsnaps))
 
-    # stencils += srca.interpolate(expr=v)
+        x_sub = ConditionalDimension("x_sub", parent=model.grid.dimensions[0], factor=space_subsample[0])
+        z_sub = ConditionalDimension("z_sub", parent=model.grid.dimensions[1], factor=space_subsample[1])
+        time_sub = ConditionalDimension("t_sub", parent=model.grid.time_dim, factor=time_subsample)
 
-    nsnaps = kwargs.pop("nsnaps", 1)
-    time_factor = kwargs.pop("time_factor", round(geometry.nt / nsnaps))
-    time_sub = ConditionalDimension(name="t_sub", parent=model.grid.time_dim, factor=time_factor)
+        vsave = TimeFunction(
+            name="vsave",
+            grid=model.grid,
+            dimensions=(time_sub, x_sub, z_sub),
+            time_dim=time_sub,
+            save=nsnaps,
+        )
+        stencils += [Eq(vsave, v)]
 
-    x_subsample = kwargs.pop("x_subsample", 1)
-    z_subsample = kwargs.pop("z_subsample", 1)
-
-    nx, nz = model.grid.shape  # Original dimensions
-
-    sub_nx = nx // x_subsample + 1
-    sub_nz = nz // z_subsample + 1
-
-    x_sub = ConditionalDimension(name="x_sub", parent=model.grid.dimensions[0], factor=x_subsample)
-    z_sub = ConditionalDimension(name="z_sub", parent=model.grid.dimensions[1], factor=z_subsample)
-
-    vsave = TimeFunction(
-        name="vsave",
-        grid=model.grid,
-        dimensions=(time_sub, x_sub, z_sub),
-        shape=(nsnaps, sub_nx, sub_nz),
-        time_dim=time_sub,
-        save=nsnaps,
-    )
-
-    stencils += [Eq(vsave, v)]
-    # Substitute spacing terms to reduce flops
-    return Operator(stencils,
-                    subs=model.spacing_map,
-                    name="Adjoint",
-                    opt=("advanced", {"gpu-fit": vsave}),
-                    **kwargs)
+    return Operator(stencils, subs=model.spacing_map, name="Adjoint", opt=("advanced", {"gpu-fit": vsave if kwargs.get("save") else None}), **kwargs)
 
 
 def GradientOperator(model, geometry, space_order=4, save=True, kernel="OT2", **kwargs):
@@ -321,3 +280,34 @@ def BornOperator(model, geometry, space_order=4, kernel="OT2", **kwargs):
 
     # Substitute spacing terms to reduce flops
     return Operator(eqn1 + source + eqn2 + receivers, subs=model.spacing_map, name="Born", **kwargs)
+
+
+def GreenOperator(model, geometry, nfreqs, space_order=4, save=False, kernel="OT2", **kwargs):
+    m = model.m
+
+    # Create symbols for forward wavefield, source and receivers
+    u = TimeFunction(name="u", grid=model.grid, save=geometry.nt if save else None, time_order=2, space_order=space_order)
+    src = geometry.src
+    rec = geometry.rec
+
+    s = model.grid.stepping_dim.spacing
+    eqn = iso_stencil(u, model, kernel)
+
+    src_term = src.inject(field=u.forward, expr=src * s**2 / m)
+    rec_term = rec.interpolate(expr=u)
+
+    f = Dimension(name="f")
+    freqs = Function(name="frequencies", dimensions=(f,), shape=(nfreqs,), dtype=np.float32)
+    freq_modes = Function(
+        name="freq_modes",
+        grid=model.grid,
+        space_order=0,
+        dtype=np.complex64,
+        dimensions=(f, *model.grid.dimensions),
+        shape=(nfreqs, *model.grid.shape),
+    )
+    omega = 2 * np.pi * freqs
+    basis = exp(-1j * omega * model.grid.time_dim * model.grid.time_dim.spacing)
+    dfts = [Inc(freq_modes, basis * u)]
+
+    return Operator(eqn + src_term + rec_term + dfts, subs=model.spacing_map, name="Forward", **kwargs)

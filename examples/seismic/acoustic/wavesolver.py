@@ -1,18 +1,11 @@
-from devito import (
-    Function,
-    TimeFunction,
-    ConditionalDimension,
-    DevitoCheckpoint,
-    CheckpointOperator,
-    Revolver,
-    Grid,
-)
+from devito import Function, TimeFunction, ConditionalDimension, DevitoCheckpoint, CheckpointOperator, Revolver, Grid, Dimension
 from devito.tools import memoized_meth
 from examples.seismic.acoustic.operators import (
     ForwardOperator,
     AdjointOperator,
     GradientOperator,
     BornOperator,
+    GreenOperator,
 )
 import numpy as np
 
@@ -104,67 +97,67 @@ class AcousticWaveSolver:
             **self._kwargs,
         )
 
+    @memoized_meth
+    def op_green(self, save=False, nfreqs=1):
+        """Cached operator for green runs"""
+        return GreenOperator(
+            self.model,
+            save=save,
+            geometry=self.geometry,
+            nfreqs=nfreqs,
+            kernel=self.kernel,
+            space_order=self.space_order,
+            **self._kwargs,
+        )
+
     def forward(self, src=None, rec=None, u=None, model=None, save=None, **kwargs):
         src = src or self.geometry.src
         rec = rec or self.geometry.rec
-
-        # Create wavefield with main grid dimensions
-        u = u or TimeFunction(
-            name="u",
-            grid=self.model.grid,
-            save=None,
-            time_order=2,
-            space_order=self.space_order,
-        )
-
+        u = u or TimeFunction(name="u", grid=self.model.grid, time_order=2, space_order=self.space_order)
         model = model or self.model
+
+        # Update physical parameters from model
         kwargs.update(model.physical_params(**kwargs))
 
+        # Extract common parameters
+        save = kwargs.pop("save", False)
+        dt = kwargs.pop("dt", self.dt)
+
         if save:
-            nx, nz = model.grid.shape  # Original dimensions
-            x_subsample = 10
-            z_subsample = 10
-            sub_nx = nx // x_subsample + 1
-            sub_nz = nz // z_subsample + 1
-
-            # Handle time subsampling
+            # Configure subsampling
             nsnaps = kwargs.pop("nsnaps", 500)
+            space_subsample = kwargs.pop("space_subsample", (10, 10))
+            time_subsample = kwargs.pop("time_subsample", None)
 
-            time_factor = max(1, round(self.geometry.nt / nsnaps))
-            time_sub = ConditionalDimension("t_sub", parent=model.grid.time_dim, factor=time_factor)
-            x_sub = ConditionalDimension(name="x_sub", parent=model.grid.dimensions[0], factor=x_subsample)
-            z_sub = ConditionalDimension(name="z_sub", parent=model.grid.dimensions[1], factor=z_subsample)
+            # Calculate time subsampling if not provided
+            if time_subsample is None:
+                time_subsample = max(1, self.geometry.nt // nsnaps)
 
-            # # Create storage for subsampled wavefield
+            # Create subsampled dimensions and storage
+            x_sub, z_sub = self._create_space_subsampling_dims(model, *space_subsample)
+            time_sub = ConditionalDimension("t_sub", parent=model.grid.time_dim, factor=time_subsample)
+
             usave = TimeFunction(
                 name="usave",
                 grid=model.grid,
                 dimensions=(time_sub, x_sub, z_sub),
-                shape=(nsnaps, sub_nx, sub_nz),
                 time_dim=time_sub,
                 save=nsnaps,
             )
 
+            # Store subsampling parameters for reference
             self._kwargs.update(
                 {
                     "nsnaps": nsnaps,
-                    "time_factor": time_factor,
-                    "x_subsample": x_subsample,
-                    "z_subsample": z_subsample,
+                    "time_subsample": time_subsample,
+                    "space_subsample": space_subsample,
                 }
             )
 
-            summary = self.op_fwd(True).apply(
-                src=src,
-                rec=rec,
-                u=u,
-                usave=usave,
-                dt=kwargs.pop("dt", self.dt),
-                **kwargs,
-            )
+            summary = self.op_fwd(True).apply(src=src, rec=rec, u=u, usave=usave, dt=dt, **kwargs)
             return rec, u, usave, summary
         else:
-            summary = self.op_fwd(save).apply(src=src, rec=rec, u=u, dt=kwargs.pop("dt", self.dt), **kwargs)
+            summary = self.op_fwd().apply(src=src, rec=rec, u=u, dt=dt, **kwargs)
             return rec, u, summary
 
     def adjoint(self, rec, srca=None, v=None, model=None, **kwargs):
@@ -191,60 +184,52 @@ class AcousticWaveSolver:
         -------
         Adjoint source, wavefield and performance summary.
         """
-        # Create a new adjoint source and receiver symbol
-        # srca = srca or self.geometry.new_src(name="srca", src_type=None)
-        # print(srca.data[:])
-
-        # Create the adjoint wavefield if not provided
+        srca = srca or self.geometry.new_src(name="srca", src_type=None)
         v = v or TimeFunction(name="v", grid=self.model.grid, time_order=2, space_order=self.space_order)
         model = model or self.model
-        # Pick vp from model unless explicitly provided
+
+        # Update physical parameters from model
         kwargs.update(model.physical_params(**kwargs))
 
+        # Extract subsampling parameters with defaults
         save = kwargs.pop("save", False)
+        dt = kwargs.pop("dt", self.dt)
+
         if save:
-            nx, nz = model.grid.shape  # Original dimensions
-            x_subsample = 10
-            z_subsample = 10
-            sub_nx = nx // x_subsample + 1
-            sub_nz = nz // z_subsample + 1
+            # Configure subsampling
             nsnaps = kwargs.pop("nsnaps", 500)
+            space_subsample = kwargs.pop("space_subsample", (10, 10))
+            time_subsample = kwargs.pop("time_subsample", None)
 
-            time_factor = max(1, round(self.geometry.nt / nsnaps))
-            time_sub = ConditionalDimension("t_sub", parent=model.grid.time_dim, factor=time_factor)
-            x_sub = ConditionalDimension(name="x_sub", parent=model.grid.dimensions[0], factor=x_subsample)
-            z_sub = ConditionalDimension(name="z_sub", parent=model.grid.dimensions[1], factor=z_subsample)
+            # Calculate time subsampling if not provided
+            if time_subsample is None:
+                time_subsample = max(1, self.geometry.nt // nsnaps)
 
-            # # Create storage for subsampled wavefield
+            # Create subsampled dimensions and storage
+            x_sub, z_sub = self._create_space_subsampling_dims(model, *space_subsample)
+            time_sub = ConditionalDimension("t_sub", parent=model.grid.time_dim, factor=time_subsample)
+
             vsave = TimeFunction(
                 name="vsave",
                 grid=model.grid,
                 dimensions=(time_sub, x_sub, z_sub),
-                shape=(nsnaps, sub_nx, sub_nz),
                 time_dim=time_sub,
                 save=nsnaps,
             )
+
+            # Store subsampling parameters for reference
             self._kwargs.update(
                 {
                     "nsnaps": nsnaps,
-                    "time_factor": time_factor,
-                    "x_subsample": x_subsample,
-                    "z_subsample": z_subsample,
+                    "time_subsample": time_subsample,
+                    "space_subsample": space_subsample,
                 }
             )
 
-            summary = self.op_adj(True).apply(
-                # src=srca,
-                rec=rec,
-                v=v,
-                vsave=vsave,
-                dt=kwargs.pop("dt", self.dt),
-                **kwargs,
-            )
-            return v, vsave, summary
+            summary = self.op_adj(True).apply(rec=rec, v=v, vsave=vsave, dt=dt, **kwargs)
+            return srca, v, vsave, summary
         else:
-            # Execute operator and return wavefield and receiver data
-            summary = self.op_adj().apply(srca=srca, rec=rec, v=v, dt=kwargs.pop("dt", self.dt), **kwargs)
+            summary = self.op_adj().apply(srca=srca, rec=rec, v=v, dt=dt, **kwargs)
             return srca, v, summary
 
     def jacobian_adjoint(
@@ -355,6 +340,48 @@ class AcousticWaveSolver:
         # Execute operator and return wavefield and receiver data
         summary = self.op_born().apply(dm=dmin, u=u, U=U, src=src, rec=rec, dt=kwargs.pop("dt", self.dt), **kwargs)
         return rec, u, U, summary
+
+    def green(self, frequencies, src=None, rec=None, u=None, model=None, save=None, **kwargs):
+
+        # Source term is read-only, so re-use the default
+        src = src or self.geometry.src
+        # Create a new receiver object to store the result
+        rec = rec or self.geometry.rec
+
+        # Create the forward wavefield if not provided
+        u = u or TimeFunction(name="u", grid=self.model.grid, save=self.geometry.nt if save else None, time_order=2, space_order=self.space_order)
+
+        model = model or self.model
+
+        f = Dimension(name="f")
+        nfreq = len(frequencies)
+        freqs = Function(name="frequencies", dimensions=(f,), shape=(nfreq,), dtype=np.float32)
+        freqs.data[:] = frequencies
+
+        freq_modes = Function(
+            name="freq_modes",
+            grid=model.grid,
+            space_order=0,
+            dtype=np.complex64,
+            dimensions=(f, *model.grid.dimensions),
+            shape=(nfreq, *model.grid.shape),
+        )
+
+        # Pick vp from model unless explicitly provided
+        kwargs.update(model.physical_params(**kwargs))
+        kwargs.update({"frequencies": freqs, "freq_modes": freq_modes})
+
+        # Execute operator and return wavefield and receiver data
+        summary = self.op_green(save, nfreq).apply(src=src, rec=rec, u=u, dt=kwargs.pop("dt", self.dt), **kwargs)
+
+        return rec, u, freq_modes, summary
+
+    def _create_space_subsampling_dims(self, model, x_factor, z_factor):
+        """Helper to create space subsampling dimensions."""
+        return (
+            ConditionalDimension("x_sub", parent=model.grid.dimensions[0], factor=x_factor),
+            ConditionalDimension("z_sub", parent=model.grid.dimensions[1], factor=z_factor),
+        )
 
     # Backward compatibility
     born = jacobian

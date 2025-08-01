@@ -9,8 +9,8 @@ from examples.seismic.plotting import plot_two_wavelets, overlay_wiggle_plot
 from examples.seismic.datasets import SeismogramDataset, VelocityModel
 from devito import info
 
-PATH_MODEL = "../data/South_ForMigr_2.dat"
-PATH_DATA = path = "../data/21-20.sgy"
+PATH_MODEL = "../../data/South_ForMigr_2.dat"
+PATH_DATA = path = "../../data/21-20.sgy"
 SO = 4
 NBL = 100
 WAVELET = "Gabor"
@@ -59,7 +59,10 @@ def main():
     dataset.dt_r = model.critical_dt
     dataset.t_max_r = tn
     dataset.resample_on()
+    print(f"{model.critical_dt:.10f}")
+    print(f"{tn:.10f}")
 
+    
     f0 = 0.25
 
     geometry = AcquisitionGeometry(
@@ -71,97 +74,98 @@ def main():
         f0=f0,
         src_type=WAVELET,
     )
-    solver = AcousticWaveSolver(model, geometry, space_order=SO)
+    print(geometry.time_axis.time_values.size)
+    # solver = AcousticWaveSolver(model, geometry, space_order=SO)
 
-    for i in range(len(dataset)):
-        # for i in range(0, len(dataset)):
-        info(f"Inverting {i+1}-th gather wavelet")
-        d_2, sx, sz, rec_x, rec_z = dataset[i]
-        d_2 *= -1
-        f0 = estimate_centroid_frequency_gather(d_2.T, model.critical_dt) / 1e3
-        info(f"Estimated gather centroid frequency: {f0*1e3:.2f} Hz, Wavelet length: {1/f0:.2f} ms")
+    # for i in range(len(dataset)):
+    #     # for i in range(0, len(dataset)):
+    #     info(f"Inverting {i+1}-th gather wavelet")
+    #     d_2, sx, sz, rec_x, rec_z = dataset[i]
+    #     d_2 *= -1
+    #     f0 = estimate_centroid_frequency_gather(d_2.T, model.critical_dt) / 1e3
+    #     info(f"Estimated gather centroid frequency: {f0*1e3:.2f} Hz, Wavelet length: {1/f0:.2f} ms")
 
-        sz *= -1
-        rec_z *= -1
-        src_pos = np.array([sx, sz])[None, :]
-        rec_pos = np.vstack([rec_x, rec_z]).T
-        f0 = f0 if WAVELET == "Ricker" else f0 * 2
-        geometry = AcquisitionGeometry(model, rec_pos, src_pos, t0, tn, f0=f0 * 2, src_type=WAVELET)
-        solver = AcousticWaveSolver(model, geometry, space_order=SO)
+    #     sz *= -1
+    #     rec_z *= -1
+    #     src_pos = np.array([sx, sz])[None, :]
+    #     rec_pos = np.vstack([rec_x, rec_z]).T
+    #     f0 = f0 if WAVELET == "Ricker" else f0 * 2
+    #     geometry = AcquisitionGeometry(model, rec_pos, src_pos, t0, tn, f0=f0 * 2, src_type=WAVELET)
+    #     solver = AcousticWaveSolver(model, geometry, space_order=SO)
 
-        d_1, _, _ = solver.forward(vp=model.vp, save=False)
-        wav1 = geometry.src.data
-        fig, ax = overlay_wiggle_plot(
-            np.array(d_1.data[:]),
-            d_2.T,
-            time_axis=geometry.time_axis.time_values,
-            xrec=rec_z,
-            title="Original vs Processed",
-        )
-        plt.savefig(
-            f"mex/forward_initial_{WAVELET}/Forward + Initial {i+1}.png",
-            dpi=300,
-            bbox_inches="tight",
-            pad_inches=0.1,
-        )
-        plt.close()
+    #     d_1, _, _ = solver.forward(vp=model.vp, save=False)
+    #     wav1 = geometry.src.data
+    #     fig, ax = overlay_wiggle_plot(
+    #         np.array(d_1.data[:]),
+    #         d_2.T,
+    #         time_axis=geometry.time_axis.time_values,
+    #         xrec=rec_z,
+    #         title="Original vs Processed",
+    #     )
+    #     plt.savefig(
+    #         f"mex/forward_initial_{WAVELET}/Forward + Initial {i+1}.png",
+    #         dpi=300,
+    #         bbox_inches="tight",
+    #         pad_inches=0.1,
+    #     )
+    #     plt.close()
 
-        stfs = []
-        for norm in [True, False]:
-            for kill in [True, False]:
-                stf = wiener_deconvolution(
-                    d_2.T,
-                    d_1.data,
-                    eps=1e-8,
-                    normalize=norm,
-                    kill_offset=kill,
-                    sz=sz,
-                    rec_z=rec_z,
-                    offset_threshold=10.0,
-                )
+    #     stfs = []
+    #     for norm in [True, False]:
+    #         for kill in [True, False]:
+    #             stf = wiener_deconvolution(
+    #                 d_2.T,
+    #                 d_1.data,
+    #                 eps=1e-8,
+    #                 normalize=norm,
+    #                 kill_offset=kill,
+    #                 sz=sz,
+    #                 rec_z=rec_z,
+    #                 offset_threshold=10.0,
+    #             )
 
-                wav3 = np.convolve(wav1.squeeze(), stf)[: d_1.shape[0]]
-                tap_f0 = 1 / f0 if WAVELET == "Ricker" else 2 / f0
-                wav3_tapered, taper = taper_wavelet(wav3, geometry.time_axis.time_values, tap_f0, 0.5 * tap_f0)
-                normstr = "norm" if norm else "nonnorm"
-                killstr = "kill" if kill else "nonkill"
-                np.savetxt(f"mex/stfs_{WAVELET}/{normstr}_{killstr}_{i+1}.txt", wav3_tapered)
+    #             wav3 = np.convolve(wav1.squeeze(), stf)[: d_1.shape[0]]
+    #             tap_f0 = 1 / f0 if WAVELET == "Ricker" else 2 / f0
+    #             wav3_tapered, taper = taper_wavelet(wav3, geometry.time_axis.time_values, tap_f0, 0.5 * tap_f0)
+    #             normstr = "norm" if norm else "nonnorm"
+    #             killstr = "kill" if kill else "nonkill"
+    #             np.savetxt(f"mex/stfs_{WAVELET}/{normstr}_{killstr}_{i+1}.txt", wav3_tapered)
 
-                geometry = AcquisitionGeometry(
-                    model,
-                    rec_pos,
-                    src_pos,
-                    t0,
-                    tn,
-                    f0=f0 * 2,
-                    src_type=None,
-                    wav_data=wav3_tapered,
-                )
-                solver = AcousticWaveSolver(model, geometry, space_order=SO)
-                d_3, _, _ = solver.forward(vp=model.vp, src=geometry.src, save=False)
+    #             geometry = AcquisitionGeometry(
+    #                 model,
+    #                 rec_pos,
+    #                 src_pos,
+    #                 t0,
+    #                 tn,
+    #                 f0=f0 * 2,
+    #                 src_type=None,
+    #                 wav_data=wav3_tapered,
+    #             )
+    #             solver = AcousticWaveSolver(model, geometry, space_order=SO)
+    #             d_3, _, _ = solver.forward(vp=model.vp, src=geometry.src, save=False)
 
-                fig, axs = plot_two_wavelets(geometry.time_axis.time_values, wav1, wav3_tapered, taper)
-                plt.savefig(
-                    f"mex/wavelets_{WAVELET}/{normstr}_{killstr}_{i+1}.png",
-                    dpi=300,
-                    bbox_inches="tight",
-                    pad_inches=0.1,
-                )
-                plt.close()
-                fig, ax = overlay_wiggle_plot(
-                    np.array(d_3.data[:]),
-                    d_2.T,
-                    time_axis=geometry.time_axis.time_values,
-                    xrec=rec_z,
-                    title="Original vs Processed",
-                )
-                plt.savefig(
-                    f"mex/forward_inverted_{WAVELET}/{normstr}_{killstr}_{i+1}.png",
-                    dpi=300,
-                    bbox_inches="tight",
-                    pad_inches=0.1,
-                )
-                plt.close()
+    #             fig, axs = plot_two_wavelets(geometry.time_axis.time_values, wav1, wav3_tapered, taper)
+    #             plt.savefig(
+    #                 f"mex/wavelets_{WAVELET}/{normstr}_{killstr}_{i+1}.png",
+    #                 dpi=300,
+    #                 bbox_inches="tight",
+    #                 pad_inches=0.1,
+    #             )
+    #             plt.close()
+    #             fig, ax = overlay_wiggle_plot(
+    #                 np.array(d_3.data[:]),
+    #                 d_2.T,
+    #                 time_axis=geometry.time_axis.time_values,
+    #                 xrec=rec_z,
+    #                 title="Original vs Processed",
+    #             )
+    #             plt.savefig(
+    #                 f"mex/forward_inverted_{WAVELET}/{normstr}_{killstr}_{i+1}.png",
+    #                 dpi=300,
+    #                 bbox_inches="tight",
+    #                 pad_inches=0.1,
+    #             )
+    #             plt.close()
 
 
 if __name__ == "__main__":
