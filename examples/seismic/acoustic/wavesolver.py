@@ -113,14 +113,13 @@ class AcousticWaveSolver:
     def forward(self, src=None, rec=None, u=None, model=None, save=None, **kwargs):
         src = src or self.geometry.src
         rec = rec or self.geometry.rec
-        u = u or TimeFunction(name="u", grid=self.model.grid, time_order=2, space_order=self.space_order)
+        u = u or TimeFunction(name="u", grid=self.model.grid, time_order=2, save=None, space_order=self.space_order)
         model = model or self.model
 
         # Update physical parameters from model
         kwargs.update(model.physical_params(**kwargs))
 
         # Extract common parameters
-        save = kwargs.pop("save", False)
         dt = kwargs.pop("dt", self.dt)
 
         if save:
@@ -128,19 +127,21 @@ class AcousticWaveSolver:
             nsnaps = kwargs.pop("nsnaps", 500)
             space_subsample = kwargs.pop("space_subsample", (10, 10))
             time_subsample = kwargs.pop("time_subsample", None)
-
+            nx, nz = model.grid.shape  # Original dimensions
+            sub_nx, sub_nz = nx//space_subsample[0] + 1, nz//space_subsample[1] + 1
             # Calculate time subsampling if not provided
             if time_subsample is None:
-                time_subsample = max(1, self.geometry.nt // nsnaps)
-
+                time_subsample = max(1, self.geometry.nt // nsnaps + 1)
             # Create subsampled dimensions and storage
-            x_sub, z_sub = self._create_space_subsampling_dims(model, *space_subsample)
+            x_sub = ConditionalDimension("x_sub", parent=model.grid.dimensions[0], factor=space_subsample[0])
+            z_sub = ConditionalDimension("z_sub", parent=model.grid.dimensions[1], factor=space_subsample[1])
             time_sub = ConditionalDimension("t_sub", parent=model.grid.time_dim, factor=time_subsample)
 
             usave = TimeFunction(
                 name="usave",
                 grid=model.grid,
                 dimensions=(time_sub, x_sub, z_sub),
+                shape=(nsnaps, sub_nx, sub_nz),
                 time_dim=time_sub,
                 save=nsnaps,
             )
@@ -155,7 +156,7 @@ class AcousticWaveSolver:
             )
 
             summary = self.op_fwd(True).apply(src=src, rec=rec, u=u, usave=usave, dt=dt, **kwargs)
-            return rec, u, usave, summary
+            return rec, usave, summary
         else:
             summary = self.op_fwd().apply(src=src, rec=rec, u=u, dt=dt, **kwargs)
             return rec, u, summary
@@ -203,16 +204,20 @@ class AcousticWaveSolver:
 
             # Calculate time subsampling if not provided
             if time_subsample is None:
-                time_subsample = max(1, self.geometry.nt // nsnaps)
-
+                time_subsample = max(1, self.geometry.nt // nsnaps + 1)
             # Create subsampled dimensions and storage
+            
+            nx, nz = model.grid.shape  # Original dimensions
+            sub_nx, sub_nz = nx//space_subsample[0] + 1, nz//space_subsample[1] + 1
             x_sub, z_sub = self._create_space_subsampling_dims(model, *space_subsample)
+
             time_sub = ConditionalDimension("t_sub", parent=model.grid.time_dim, factor=time_subsample)
 
             vsave = TimeFunction(
                 name="vsave",
                 grid=model.grid,
                 dimensions=(time_sub, x_sub, z_sub),
+                shape=(nsnaps, sub_nx, sub_nz),
                 time_dim=time_sub,
                 save=nsnaps,
             )
@@ -226,8 +231,8 @@ class AcousticWaveSolver:
                 }
             )
 
-            summary = self.op_adj(True).apply(rec=rec, v=v, vsave=vsave, dt=dt, **kwargs)
-            return srca, v, vsave, summary
+            summary = self.op_adj(True).apply(srca=srca, rec=rec, v=v, vsave=vsave, dt=dt, **kwargs)
+            return srca, vsave, summary
         else:
             summary = self.op_adj().apply(srca=srca, rec=rec, v=v, dt=dt, **kwargs)
             return srca, v, summary

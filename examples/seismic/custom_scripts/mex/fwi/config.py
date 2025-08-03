@@ -4,7 +4,7 @@ import numpy as np
 # Paths
 PATH_MODEL = "../../../data/South_ForMigr_2.dat"
 PATH_DATA = "../../../data/21-20.sgy"
-PATH_WAVELETS = "../conventional_wavelets"
+PATH_WAVELETS = "../adjoint_wavelets"
 
 # Processing parameters
 SO = 4
@@ -18,7 +18,7 @@ dtype = np.float32
 NITER = 10
 TMAX = 40.0
 WAVELETS_DT = 0.0030840000
-WAVELETS_TMAX = 69.3780000000
+WAVELETS_TMAX = 40.0
 
 # FK Filter parameters
 FK_PARAMS = {

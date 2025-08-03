@@ -23,7 +23,7 @@ for ((iter=0; iter<$MAX_ITER; iter++)); do
     unset DEVITO_ARCH
     
     echo "Computing gradients for iteration $iter..."
-    python grad_computation.py --iter $iter --batch-size 10
+    python grad_computation.py --iter $iter --batch-size 20
     
     echo "Updating image for iteration $iter..."
     python image_update.py --iter $iter

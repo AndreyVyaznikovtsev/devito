@@ -7,20 +7,11 @@ import os
 from scipy.interpolate import interpn
 import argparse
 from wavefield_computation import setup_model_and_geometry
-
-def get_model_shape():
-    return 2630, 3640
-
-def get_num_shots():
-    return 59
+from grad_computation import get_subn, get_model_shape
 
 def load_gradient(iter_num):
     """Load gradient from binary file for specific iteration"""
     path = f"{OUTPUT_DIRS['gradients']}/grad_full_{iter_num}.npy"
-    nx, nz = get_model_shape()
-    sub_nx = nx // SUBSAMPLING + 1
-    sub_nz = nz // SUBSAMPLING + 1
-
     buff = np.load(path)
     return upsample_image(buff, *get_model_shape()) # upsample on loading
 
@@ -66,13 +57,9 @@ def update_image(iter_num):
     
     image_current = load_image(iter_num) # on model grid
     grad_current = load_gradient(iter_num) # on model grid
-    print(image_current.min(), image_current.max())
-    alpha = 0.5 / np.max(grad_current)
-    print(alpha)
+    alpha = 0.05 / np.quantile(grad_current, 0.9)
     image_new = update_with_box(image_current, alpha=alpha, dm=grad_current)
-    print(image_new.min(), image_new.max())
     np.save(f"{OUTPUT_DIRS['images']}/image_iter_{iter_num+1}.npy", image_new)
-    
     elapsed = time.time() - start_time
     print(f"Iteration {iter_num} completed in {elapsed:.2f} seconds")
     

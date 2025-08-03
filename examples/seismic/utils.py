@@ -307,7 +307,7 @@ class AcquisitionGeometry(Pickable):
 
     @property
     def r(self):
-        return self._r
+        return self._rPr
 
     @property
     def interpolation(self):
@@ -360,7 +360,7 @@ class AcquisitionGeometry(Pickable):
     def new_src(self, name="src", src_type="self", coordinates=None):
         coords = coordinates or self.src_positions
         if self.src_type is None or src_type is None:
-            warning("No source type defined, returning uninitiallized (zero) source")
+            # warning("No source type defined, returning uninitiallized (zero) source")
             # Prepare common arguments
             src_args = {
                 "name": name,
@@ -374,6 +374,7 @@ class AcquisitionGeometry(Pickable):
             
             # Add wav_data if it exists
             if self.wav_data is not None:
+                # warning("Initializing source with custom data")
                 src_args["data"] = self.wav_data.reshape(-1, 1)
             else:
                 warning("No source type defined, returning uninitialized (zero) source")

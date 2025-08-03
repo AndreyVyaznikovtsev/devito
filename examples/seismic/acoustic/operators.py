@@ -110,6 +110,7 @@ def iso_stencil(field, model, kernel, **kwargs):
 
 
 def ForwardOperator(model, geometry, space_order=4, save=False, kernel="OT2", **kwargs):
+    m = model.m
     u = TimeFunction(name="u", grid=model.grid, save=None, time_order=2, space_order=space_order)
     src = geometry.src
     rec = geometry.rec
@@ -117,15 +118,16 @@ def ForwardOperator(model, geometry, space_order=4, save=False, kernel="OT2", **
     # Create wave equation stencils
     s = model.grid.stepping_dim.spacing
     stencils = iso_stencil(u, model, kernel)
-    stencils += src.inject(field=u.forward, expr=src * s**2 / model.m)
+    stencils += src.inject(field=u.forward, expr=src * s**2 / m)
     stencils += rec.interpolate(expr=u)
 
     # Handle subsampling if requested
-    if kwargs.get("save", False):
+    if save:
         nsnaps = kwargs.pop("nsnaps", 1)
         space_subsample = kwargs.pop("space_subsample", (1, 1))
         time_subsample = kwargs.pop("time_subsample", round(geometry.nt / nsnaps))
-
+        nx, nz = model.grid.shape  # Original dimensions
+        sub_nx, sub_nz = nx//space_subsample[0] + 1, nz//space_subsample[1] + 1
         x_sub = ConditionalDimension("x_sub", parent=model.grid.dimensions[0], factor=space_subsample[0])
         z_sub = ConditionalDimension("z_sub", parent=model.grid.dimensions[1], factor=space_subsample[1])
         time_sub = ConditionalDimension("t_sub", parent=model.grid.time_dim, factor=time_subsample)
@@ -134,12 +136,12 @@ def ForwardOperator(model, geometry, space_order=4, save=False, kernel="OT2", **
             name="usave",
             grid=model.grid,
             dimensions=(time_sub, x_sub, z_sub),
+            shape=(nsnaps, sub_nx, sub_nz),
             time_dim=time_sub,
             save=nsnaps,
         )
         stencils += [Eq(usave, u)]
-
-    return Operator(stencils, subs=model.spacing_map, name="Forward", opt=("advanced", {"gpu-fit": usave if kwargs.get("save") else None}), **kwargs)
+    return Operator(stencils, subs=model.spacing_map, name="Forward", opt=("advanced", {"gpu-fit": usave if save else None}), **kwargs)
 
 
 def AdjointOperator(model, geometry, save=None, space_order=4, kernel="OT2", **kwargs):
@@ -173,7 +175,8 @@ def AdjointOperator(model, geometry, save=None, space_order=4, kernel="OT2", **k
         nsnaps = kwargs.pop("nsnaps", 1)
         space_subsample = kwargs.pop("space_subsample", (1, 1))
         time_subsample = kwargs.pop("time_subsample", round(geometry.nt / nsnaps))
-
+        nx, nz = model.grid.shape  # Original dimensions
+        sub_nx, sub_nz = nx//space_subsample[0] + 1, nz//space_subsample[1] + 1
         x_sub = ConditionalDimension("x_sub", parent=model.grid.dimensions[0], factor=space_subsample[0])
         z_sub = ConditionalDimension("z_sub", parent=model.grid.dimensions[1], factor=space_subsample[1])
         time_sub = ConditionalDimension("t_sub", parent=model.grid.time_dim, factor=time_subsample)
@@ -182,12 +185,13 @@ def AdjointOperator(model, geometry, save=None, space_order=4, kernel="OT2", **k
             name="vsave",
             grid=model.grid,
             dimensions=(time_sub, x_sub, z_sub),
+            shape=(nsnaps, sub_nx, sub_nz),
             time_dim=time_sub,
             save=nsnaps,
         )
         stencils += [Eq(vsave, v)]
 
-    return Operator(stencils, subs=model.spacing_map, name="Adjoint", opt=("advanced", {"gpu-fit": vsave if kwargs.get("save") else None}), **kwargs)
+    return Operator(stencils, subs=model.spacing_map, name="Adjoint", opt=("advanced", {"gpu-fit": vsave if save else None}), **kwargs)
 
 
 def GradientOperator(model, geometry, space_order=4, save=True, kernel="OT2", **kwargs):

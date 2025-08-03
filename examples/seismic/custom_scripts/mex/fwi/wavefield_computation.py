@@ -10,6 +10,7 @@ import os
 from config import *
 import argparse
 from datetime import datetime
+from matplotlib import pyplot as plt
 
 
 
@@ -36,8 +37,8 @@ def setup_model_and_geometry(iter_num):
     if iter_num == 0:
         vp = velmodel.vp.T
     else:
-        vp = np.load(f"{OUTPUT_DIRS['images']}/image_iter_{iter_num}.npy")[NBL:-NBL, NBL:-NBL]
-        print(vp.shape)
+        # vp = np.load(f"{OUTPUT_DIRS['images']}/image_iter_{iter_num}.npy")[NBL:-NBL, NBL:-NBL]
+        vp = np.load(f"{OUTPUT_DIRS['images']}/image_iter_{iter_num}.npy")
     
     model = SeismicModel(
         vp=vp,
@@ -51,7 +52,8 @@ def setup_model_and_geometry(iter_num):
     )
     if iter_num == 0:
         path = f"{OUTPUT_DIRS['images']}/image_iter_{iter_num}.npy"
-        np.save(path, model.vp.data[:])
+        np.save(path, model.vp.data[NBL:-NBL, NBL:-NBL])
+        print(model.vp.data[NBL:-NBL, NBL:-NBL].shape)
     
     return model, dataset
 
@@ -64,27 +66,29 @@ def compute_wavefields(model, dataset, shot_id, iter_num, recon, inv):
     
     src_pos = np.array([sx, sz])[None, :]
     rec_pos = np.vstack([rec_x, rec_z]).T
-    wav_data = np.load(f"{PATH_WAVELETS}/{shot_id+1}.npy")
+    wav_data_source = np.load(f"{PATH_WAVELETS}/Mex_wavelet_{shot_id}_norm.npy")
+    scale_factor = np.load(f"{PATH_WAVELETS}/Mex_wavelet_{shot_id}_norm_scalar.npy")
     wav_time = np.arange(0, WAVELETS_TMAX + WAVELETS_DT, WAVELETS_DT)
+    
     new_time = np.linspace(0, TMAX, d_obs.shape[1])
-    interp_func = interp1d(wav_time, wav_data, kind='linear', 
+    interp_func = interp1d(wav_time, wav_data_source, kind='linear', 
                       bounds_error=False, fill_value=0.0)
     wav_data = interp_func(new_time)
-
+    
+    fig, axs = plt.subplots(1, 1)
+    plt.plot(wav_time, wav_data_source)
+    plt.plot(new_time, wav_data)
+    plt.savefig(f"Interp_{shot_id}.png")
+    plt.close()
     geometry = AcquisitionGeometry(
         model, rec_pos, src_pos,
         t0, tn, f0=0.25,
-        src_type=None, wav_data=wav_data
+        src_type=None, wav_data=wav_data*scale_factor
     )
     d_syn = Receiver(name='d_syn', grid=model.grid, time_range=geometry.time_axis,
                      coordinates=geometry.rec_positions)
     solver = AcousticWaveSolver(model, geometry, space_order=SO)
-    _, _, u0, _ = solver.forward(vp=model.vp, save=True, nsnaps=NSNAPS, rec=d_syn)
-    scale_factor = np.sqrt(np.sum(d_obs.ravel()**2))/np.sqrt(np.sum(d_syn.data[:].ravel()**2))
-    if iter_num == 0:
-        np.save(f"{OUTPUT_DIRS['forward_snaps']}/scale_factor_{shot_id+1}.npy", scale_factor)
-    else:
-        scale_factor = np.load(f"{OUTPUT_DIRS['forward_snaps']}/scale_factor_{shot_id+1}.npy")
+    _, u0, _ = solver.forward(vp=model.vp, save=True, nsnaps=NSNAPS, rec=d_syn)
     
     if recon == 1:
         np.save(f"{OUTPUT_DIRS['forward_snaps']}/recon_gather_{shot_id+1}.npy", d_syn.data[:])
@@ -92,11 +96,11 @@ def compute_wavefields(model, dataset, shot_id, iter_num, recon, inv):
     if inv == 1:
         residual = Receiver(name='residual', grid=model.grid, time_range=geometry.time_axis,
                         coordinates=geometry.rec_positions)
-        residual.data[:] = d_syn.data[:] - d_obs.T/scale_factor
+        residual.data[:] = d_syn.data[:] - d_obs.T
         _, v, _ = solver.adjoint(vp=model.vp, rec=residual, save=True, nsnaps=NSNAPS)
-        np.save(f"{OUTPUT_DIRS['forward_snaps']}/{shot_id+1}.npy", u0.data[:])
-        np.save(f"{OUTPUT_DIRS['adjoint_snaps']}/{shot_id+1}.npy", v.data[:])
-        objective = 0.5*norm(residual)**2
+        np.save(f"{OUTPUT_DIRS['forward_snaps']}/{shot_id+1}.npy", u0.data[:, NBL//SUBSAMPLING:-NBL//SUBSAMPLING, NBL//SUBSAMPLING:-NBL//SUBSAMPLING])
+        np.save(f"{OUTPUT_DIRS['adjoint_snaps']}/{shot_id+1}.npy", v.data[:, NBL//SUBSAMPLING:-NBL//SUBSAMPLING, NBL//SUBSAMPLING:-NBL//SUBSAMPLING])
+        objective = 0.5*norm(residual)**2/scale_factor
 
     return objective
 
@@ -131,8 +135,8 @@ def main():
                                       inv=args.inv
                                       )
         objective += obj_shot
-        print('\033[1m' + f'{i+1}. Current objective - {objective:.5f}' + '\033[0m')
-
+        print('\033[1m' + f'{i+1}. Current objective - {objective/len(dataset):.5f}' + '\033[0m')
+    objective /= len(dataset)
     message = f"Iteration {args.iter} - Objective: {objective:.5f}"
     print('\033[1m' + message + '\033[0m')
     with open(log_file, 'a') as f:
