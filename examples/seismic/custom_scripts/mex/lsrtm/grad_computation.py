@@ -122,6 +122,7 @@ def main_compute_gradients_batched(iter, batch_size=4):
     grad_full_d = torch.zeros((sub_nx, sub_nz), device='cuda')
     
     num_shots = get_num_shots()
+    # num_shots = 47
     for batch_start in range(0, num_shots, batch_size):
         batch_end = min(batch_start + batch_size, num_shots)
         shot_ids = range(batch_start, batch_end)
@@ -142,8 +143,8 @@ def main_compute_gradients_batched(iter, batch_size=4):
     # grad_full += torch.sum(grad_batch, dim=0)
 
     # Save results
-    np.save(f"{OUTPUT_DIRS['gradients']}/grad_full_u_{iter}.npy", grad_full_u.cpu().numpy())
-    np.save(f"{OUTPUT_DIRS['gradients']}/grad_full_d_{iter}.npy", grad_full_d.cpu().numpy())
+    np.save(f"{OUTPUT_DIRS['gradients']}/grad_full_u_{iter+1}.npy", grad_full_u.cpu().numpy())
+    np.save(f"{OUTPUT_DIRS['gradients']}/grad_full_d_{iter+1}.npy", grad_full_d.cpu().numpy())
 
     
     end = time.time()

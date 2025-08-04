@@ -11,9 +11,9 @@ from grad_computation import get_subn, get_model_shape
 
 def load_gradient(iter_num):
     """Load gradient from binary file for specific iteration"""
-    path = f"{OUTPUT_DIRS['gradients']}/grad_full_{iter_num}.npy"
-    buff = np.load(path)
-    return upsample_image(buff, *get_model_shape()) # upsample on loading
+    path1 = f"{OUTPUT_DIRS['gradients']}/grad_full_d_{iter_num}.npy"
+    path2 = f"{OUTPUT_DIRS['gradients']}/grad_full_u_{iter_num}.npy"
+    return np.load(path1), np.load(path2)
 
 def load_image(iter_num):
     """Load image from previous iteration"""
@@ -45,23 +45,16 @@ def upsample_image(image_subsampled, nx_orig, nz_orig):
     return image_upsampled
 
 
-def update_with_box(vp, alpha, dm, vmin=0.5, vmax=5.5):
-    assert vp.shape == dm.shape, (vp.shape, dm.shape)
-    update = vp + alpha * dm
-    vp = np.clip(update, vmin, vmax)
-    return vp
-
 def update_image(iter_num):
     """Perform a single image update for the current iteration"""
     start_time = time.time()
     
-    image_current = load_image(iter_num) # on model grid
-    image_initial = load_image(iter_num=0)
-    grad_current = load_gradient(iter_num) # on model grid
-    alpha = 0.05 / np.quantile(grad_current, 0.9)
-    beta = 0.1
-    grad_current -= beta*(image_current - image_initial)
-    image_new = update_with_box(image_current, alpha=alpha, dm=grad_current)
+    image_current = load_image(iter_num)
+    grad_d, grad_u = load_gradient(iter_num+1)
+    grad = grad_d - grad_u
+    grad = upsample_image(grad, *get_model_shape())
+    alpha = 0.2
+    image_new = image_current - alpha*grad
     np.save(f"{OUTPUT_DIRS['images']}/image_iter_{iter_num+1}.npy", image_new)
     elapsed = time.time() - start_time
     print(f"Iteration {iter_num} completed in {elapsed:.2f} seconds")

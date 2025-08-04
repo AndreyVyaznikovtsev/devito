@@ -166,8 +166,8 @@ class FKFilter3D:
         
         # Return shape matches input shape
         if input.ndim == 3:  # If input was (Z,X,T)
-            return result.squeeze(0).cpu()  # Return (Z,X,T)
-        return result.cpu()  # Return (B,Z,X,T)
+            return result.squeeze(0)  # Return (Z,X,T)
+        return result  # Return (B,Z,X,T)
 
     def plot_filter_slice(self, t_idx=0, lims=None):
         """Visualize filter slice"""

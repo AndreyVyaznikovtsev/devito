@@ -365,7 +365,7 @@ def plot_shotrecord(rec, t0, tn, colorbar=True):
     # extent = [model.origin[0], model.origin[0] + 1e-3*model.domain_size[0],
     #   model.origin[1] + 1e-3*model.domain_size[1], model.origin[1]]
     print(rec.shape)
-    plot = plt.imshow(rec.T, vmin=-scale, vmax=scale, cmap=cm.gray, aspect="equal")
+    plot = plt.imshow(rec.T, vmin=-scale, vmax=scale, cmap=cm.gray, aspect="auto")
     plt.xlabel("X position (km)")
     plt.ylabel("Y position (km)")
     # major_ticks = np.arange(0, rec.shape[0], 500)

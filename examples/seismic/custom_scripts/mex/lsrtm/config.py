@@ -4,9 +4,10 @@ import numpy as np
 # Paths
 PATH_MODEL = "../../../data/South_ForMigr_2.dat"
 PATH_DATA = "../../../data/21-20.sgy"
-PATH_WAVELETS = "../conventional_wavelets"
+PATH_WAVELETS = "../adjoint_wavelets"
 
 # Processing parameters
+NUM_SHOTS = 59
 SO = 4
 WAVELET = "Ricker"
 NBL = 500
@@ -16,6 +17,10 @@ SUBSAMPLING = 10
 NSNAPS = 500
 dtype = np.float32
 NITER = 10
+TMAX = 40.0
+WAVELETS_DT = 0.0030840000
+WAVELETS_TMAX = 40.0
+SHOT_IDS = range(0, NUM_SHOTS, 10)
 
 # FK Filter parameters
 FK_PARAMS = {
