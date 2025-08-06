@@ -119,27 +119,81 @@ class FKFilter3D:
         kernel = torch.exp(-(x**2) / (2 * sigma**2))
         return kernel / kernel.sum()
 
-    # def __call__(self, input: np.ndarray):
-    #     """Process single (1, Z, X, T) or (Z, X, T) input"""
-    #     # Ensure correct shape (1, Z, X, T)
-    #     input_t = torch.as_tensor(input, device=self.device)
-    #     if input_t.ndim == 3:
-    #         input_t = input_t.unsqueeze(0)
-    #     _, Z, X, T = input_t.shape
 
-    #     # Initialize filter if needed
-    #     if self.current_shape != (Z, X, T):
-    #         self._compute_filter(Z, X, T)
-    #         self.current_shape = (Z, X, T)
+    def filter_l1(self, input: torch.Tensor) -> torch.Tensor:
+        """
+        Corrected processing pipeline:
+        1. 3D FFT
+        2. FK filter
+        3. Partial IFFT (Z,X)
+        4. Sign transform
+        5. Final IFFT (time)
+        """
+        # Ensure correct shape (B, Z, X, T)
+        if input.ndim == 3:
+            input = input.unsqueeze(0)
+        B, Z, X, T = input.shape
 
-    #     # Forward FFT (real along last dim)
-    #     spectrum = fft.rfftn(input_t)
-    #     spectrum = fft.fftshift(spectrum, dim=(-3, -2))  # Shift Z,X
+        # Initialize filter if needed
+        if self.current_shape != (Z, X, T):
+            self._compute_filter(Z, X, T)
+            self.current_shape = (Z, X, T)
 
-    #     # Apply filter
-    #     spectrum = spectrum * self.filter
+        # 1. Forward 3D FFT
+        spectrum = fft.rfftn(input)
+        spectrum = fft.fftshift(spectrum, dim=(-3, -2))  # Shift Z,X
 
-    #     return fft.irfftn(fft.ifftshift(spectrum, dim=(-3, -2))).squeeze().cpu().numpy()  # Returns (Z, X, T) or (1, Z, X, T)
+        # 2. Apply FK filter
+        filtered_spectrum = spectrum * self.filter.unsqueeze(0)
+
+        # 3. Partial IFFT along Z and X only
+        # space_domain = fft.ifftshift(filtered_spectrum, dim=(-3, -2))
+        # space_domain = fft.ifft2(space_domain, dim=(-3, -2))
+
+        # 4. Apply sign transformation (this is R(x,ω))
+        transformed = torch.sign(torch.real(filtered_spectrum)) + 1j * torch.sign(torch.imag(filtered_spectrum))
+        transformed = fft.ifftshift(transformed, dim=(-3, -2))
+        # 5. Final IFFT along time dimension only
+        result = fft.irfftn(transformed)
+        return result.squeeze(0) if input.ndim == 3 else result
+    
+    def partial(self, input: torch.Tensor, isl1: bool) -> torch.Tensor:
+        """
+        Corrected processing pipeline:
+        1. 3D FFT
+        2. FK filter
+        3. Partial IFFT (Z,X)
+        4. Sign transform
+        5. Final IFFT (time)
+        """
+        # Ensure correct shape (B, Z, X, T)
+        if input.ndim == 3:
+            input = input.unsqueeze(0)
+        B, Z, X, T = input.shape
+
+        # Initialize filter if needed
+        if self.current_shape != (Z, X, T):
+            self._compute_filter(Z, X, T)
+            self.current_shape = (Z, X, T)
+
+        # 1. Forward 3D FFT
+        spectrum = fft.rfftn(input)
+        spectrum = fft.fftshift(spectrum, dim=(-3, -2))  # Shift Z,X
+
+        # 2. Apply FK filter
+        filtered_spectrum = spectrum * self.filter.unsqueeze(0)
+
+        # 3. Partial IFFT along Z and X only
+        space_domain = fft.ifftshift(filtered_spectrum, dim=(-3, -2))
+        space_domain = fft.ifftn(space_domain, dim=(-3, -2))
+        
+        if isl1:
+        # 4. Apply sign transformation (this is R(x,ω))
+            transformed = torch.sign(torch.real(space_domain)) + 1j * torch.sign(torch.imag(space_domain))
+        else:
+            transformed = space_domain
+
+        return transformed.squeeze(0) if input.ndim == 3 else transformed
 
 
     def __call__(self, input: torch.Tensor):

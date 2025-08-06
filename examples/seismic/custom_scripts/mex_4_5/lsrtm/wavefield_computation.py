@@ -66,8 +66,8 @@ def compute_forward_snaps(model, dataset, shot_id):
     
     src_pos = np.array([sx, sz])[None, :]
     rec_pos = np.vstack([rec_x, rec_z]).T
-    wav_data_source = np.load(f"{PATH_WAVELETS}/wavelet_{shot_id}_norm.npy")
-    scale_factor = np.load(f"{PATH_WAVELETS}/wavelet_scale_{shot_id}.npy")
+    wav_data_source = np.load(f"{PATH_WAVELETS}/Mex_wavelet_{shot_id}_norm.npy")
+    scale_factor = np.load(f"{PATH_WAVELETS}/Mex_wavelet_{shot_id}_norm_scalar.npy")
     wav_time = np.arange(0, WAVELETS_TMAX + WAVELETS_DT, WAVELETS_DT)
     
     new_time = np.linspace(0, TMAX, d_obs.shape[1])
@@ -83,7 +83,7 @@ def compute_forward_snaps(model, dataset, shot_id):
     d_syn = Receiver(name='d_syn', grid=model.grid, time_range=geometry.time_axis,
                      coordinates=geometry.rec_positions)
     solver = AcousticWaveSolver(model, geometry, space_order=SO)
-    _, u0, _ = solver.forward(vp=model.vp, save=True, nsnaps=NSNAPS, rec=d_syn) # space_subsample(SUBSAMPLING, SUBSAMPLING) 
+    _, u0, _ = solver.forward(vp=model.vp, save=True, nsnaps=NSNAPS, rec=d_syn)
     np.save(f"{OUTPUT_DIRS['forward_snaps']}/{shot_id+1}.npy", u0.data[:, NBL//SUBSAMPLING:-NBL//SUBSAMPLING, NBL//SUBSAMPLING:-NBL//SUBSAMPLING])
 
 
@@ -96,8 +96,8 @@ def compute_wavefields(model, dataset, shot_id, dm, iter_num):
     
     src_pos = np.array([sx, sz])[None, :]
     rec_pos = np.vstack([rec_x, rec_z]).T
-    wav_data_source = np.load(f"{PATH_WAVELETS}/wavelet_{shot_id}_norm.npy")
-    scale_factor = np.load(f"{PATH_WAVELETS}/wavelet_scale_{shot_id}.npy")
+    wav_data_source = np.load(f"{PATH_WAVELETS}/Mex_wavelet_{shot_id}_norm.npy")
+    scale_factor = np.load(f"{PATH_WAVELETS}/Mex_wavelet_{shot_id}_norm_scalar.npy")
     wav_time = np.arange(0, WAVELETS_TMAX + WAVELETS_DT, WAVELETS_DT)
     
     new_time = np.linspace(0, TMAX, d_obs.shape[1])
@@ -157,14 +157,14 @@ def main():
     
     # if args.iter == 0:
     #     for i in range(len(dataset)):
-    #         compute_forward_snaps(model, dataset, i)
+    #         compute_forward_snaps(model, dataset, i, iter_num=args.iter, recon=1)
     
     dm = load_current_dm(args.iter)
 
     objective = 0.
     for i in range(len(dataset)):
     # for i in SHOT_IDS:
-        scale_factor = np.load(f"{PATH_WAVELETS}/wavelet_scale_{i}.npy")
+        scale_factor = np.load(f"{PATH_WAVELETS}/Mex_wavelet_{i}_norm_scalar.npy")
         dmin = Function(name='dm', grid=model.grid)
         # dmin.data[:] = dm*len(dataset)
         dmin.data[:] = dm*np.sqrt(scale_factor)*len(dataset)

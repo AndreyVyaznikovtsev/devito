@@ -3,8 +3,8 @@ import numpy as np
 
 # Paths
 PATH_MODEL = "../../../data/South_ForMigr_2.dat"
-PATH_DATA = "../../../data/21-20.sgy"
-PATH_WAVELETS = "../adjoint_wavelets"
+PATH_DATA = "../../../data/21-20_dsub.sgy"
+PATH_WAVELETS = "../adjoint_wavelets2"
 
 # Processing parameters
 NUM_SHOTS = 59

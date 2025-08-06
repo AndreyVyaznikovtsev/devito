@@ -1,5 +1,5 @@
 #!/bin/bash
-MAX_ITER=5
+MAX_ITER=30
 START_ITER=0
 
 if [ "$1" != "" ]; then

@@ -9,6 +9,7 @@ from examples.seismic.fk_filter import FKFilter3D
 import argparse
 import torch
 from wavefield_computation import setup_model_and_geometry
+from torch.fft import irfft
 
 def get_model_shape():
     return 1630, 2640
@@ -93,20 +94,40 @@ def compute_gradient_batch_l1(shot_ids, fk_down, fk_up, dt, scalers=None):
     v_batch = load_wavefield_snaps_batch(shot_ids, 'adjoint').to('cuda')   # [B, T, X, Z]
     
     # Apply filters
-    u0_up = fk_up((u0_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)  # Back to [B, T, X, Z]
-    u0_down = fk_down((u0_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
-    v_up = fk_up.filter_l1((v_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
-    v_down = fk_down.filter_l1((v_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
+    # u0_up = fk_up((u0_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)  # Back to [B, T, X, Z]
+    # u0_down = fk_down((u0_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
+    # v_up = fk_up.filter_l1((v_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
+    # v_down = fk_down.filter_l1((v_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
     
+    # u0_up = fk_up((u0_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
+    # u0_down = fk_down((u0_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
+    # v_up = fk_up.filter_l1((v_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
+    # v_down = fk_down.filter_l1((v_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
+
+    u0_up = fk_up.filter_l1((u0_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
+    u0_down = fk_down.filter_l1((u0_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
+    v_up = fk_up((v_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
+    v_down = fk_down((v_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
+
+    # u0_up = fk_up.partial((v_batch).permute(0, 3, 2, 1), isl1=False)
+    # u0_down = fk_down.partial((v_batch).permute(0, 3, 2, 1), isl1=False)
+    # v_up = fk_up.partial((v_batch).permute(0, 3, 2, 1), isl1=True)
+    # v_down = fk_down.partial((v_batch).permute(0, 3, 2, 1), isl1=True)
+
     # Compute gradients for each shot in batch
     grad_up = calc_grad_batch_l1(u0_up, v_down)
     grad_down = calc_grad_batch_l1(u0_down, v_up)
+    print(v_up.shape)
+    # grad_up = torch.sum(torch.real(u0_up*v_down), dim=-1).permute(0, 2, 1)
+    # grad_down = torch.sum(torch.real(u0_down*v_up), dim=-1).permute(0, 2, 1)
+
+    print(grad_up.shape)
+
     if scalers is None:
-        return (grad/(torch.sum(u0_batch**2, dim=1) + 1e-12) for grad in [grad_up, grad_down])
+        return (grad for grad in [grad_up, grad_down])
     else:
         return (grad/scalers.unsqueeze(-1).unsqueeze(-1) for grad in [grad_up, grad_down])
     # return grad_batch
-
 
 def main_compute_gradients_batched(iter, batch_size=4):
     """Main function to compute all gradients using batches"""
@@ -150,6 +171,7 @@ def main_compute_gradients_batched(iter, batch_size=4):
     grad_full_d = torch.zeros((sub_nx, sub_nz), device='cuda')
     
     num_shots = get_num_shots()
+    # num_shots = 47
     for batch_start in range(0, num_shots, batch_size):
         batch_end = min(batch_start + batch_size, num_shots)
         shot_ids = range(batch_start, batch_end)
@@ -157,7 +179,7 @@ def main_compute_gradients_batched(iter, batch_size=4):
         # grad_batch = compute_gradient_batch_nofilter(shot_ids, TMAX/(NSNAPS+1))
         scalers = load_scalers(shot_ids).to('cuda')
         # scalers = None
-        grad_u_batch, grad_d_batch = compute_gradient_batch_l1(shot_ids, fk_down=fk_down, fk_up=fk_up, dt=TMAX/(NSNAPS+1), scalers=scalers)
+        grad_u_batch, grad_d_batch = compute_gradient_batch(shot_ids, fk_down=fk_down, fk_up=fk_up, dt=TMAX/(NSNAPS+1), scalers=scalers)
 
         grad_full_u += torch.sum(grad_u_batch, dim=0)
         grad_full_d += torch.sum(grad_d_batch, dim=0)
@@ -170,8 +192,9 @@ def main_compute_gradients_batched(iter, batch_size=4):
     # grad_full += torch.sum(grad_batch, dim=0)
 
     # Save results
-    np.save(f"{OUTPUT_DIRS['gradients']}/grad_l1_u_{iter}.npy", grad_full_u.cpu().numpy())
-    np.save(f"{OUTPUT_DIRS['gradients']}/grad_l1_d_{iter}.npy", grad_full_d.cpu().numpy())
+    np.save(f"{OUTPUT_DIRS['gradients']}/grad_full_u_{iter}.npy", grad_full_u.cpu().numpy())
+    np.save(f"{OUTPUT_DIRS['gradients']}/grad_full_d_{iter}.npy", grad_full_d.cpu().numpy())
+
     
     end = time.time()
     print(f"Gradient computation completed in {end - start:.2f} seconds")

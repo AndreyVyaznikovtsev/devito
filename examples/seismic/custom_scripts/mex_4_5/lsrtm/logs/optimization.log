@@ -179,19 +179,19 @@ Iteration 3 - Objective: 0.43381
 Iteration 4 - Objective: 0.70115
 Iteration 5 - Objective: 1.52795
 Iteration 6 - Objective: 4.22929
-Iteration 1 - Objective:  0.37280
-Iteration 2 - Objective:  0.54433
-Iteration 3 - Objective:  1.36709
-Iteration 4 - Objective:  5.41739
-Iteration 1 - Objective:  0.37280
-Iteration 2 - Objective:  0.34077
-Iteration 3 - Objective:  0.37472
-Iteration 4 - Objective:  0.33117
-Iteration 5 - Objective:  0.31484
-Iteration 6 - Objective:  0.34977
-Iteration 7 - Objective:  0.30034
-Iteration 8 - Objective:  0.29826
-Iteration 9 - Objective:  0.30825
+Iteration 1 - Objective: 0.37280
+Iteration 2 - Objective: 0.54433
+Iteration 3 - Objective: 1.36709
+Iteration 4 - Objective: 5.41739
+Iteration 1 - Objective: 0.37280
+Iteration 2 - Objective: 0.34077
+Iteration 3 - Objective: 0.37472
+Iteration 4 - Objective: 0.33117
+Iteration 5 - Objective: 0.31484
+Iteration 6 - Objective: 0.34977
+Iteration 7 - Objective: 0.30034
+Iteration 8 - Objective: 0.29826
+Iteration 9 - Objective: 0.30825
 Iteration 10 - Objective: 0.30201
 Iteration 11 - Objective: 0.28980
 Iteration 12 - Objective: 0.30924
@@ -212,13 +212,3 @@ Iteration 26 - Objective: 0.27954
 Iteration 27 - Objective: 0.28336
 Iteration 28 - Objective: 0.29800
 Iteration 29 - Objective: 0.28358
-LSRTM experiment at 2025-08-06 17:37:46.605837, recon - 0, inv - 1
-LSRTM experiment at 2025-08-06 17:38:15.538717, recon - 0, inv - 1
-LSRTM experiment at 2025-08-06 17:44:53.298918, recon - 0, inv - 1
-Iteration 0 - Objective: 0.96270
-Iteration 1 - Objective: 0.42578
-Iteration 2 - Objective: 0.40244
-Iteration 3 - Objective: 0.42344
-LSRTM experiment at 2025-08-06 18:59:25.819086, recon - 0, inv - 1
-Iteration 0 - Objective: 0.96270
-Iteration 1 - Objective: 0.36196

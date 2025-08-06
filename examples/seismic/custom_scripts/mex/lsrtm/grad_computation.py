@@ -9,6 +9,7 @@ from examples.seismic.fk_filter import FKFilter3D
 import argparse
 import torch
 from wavefield_computation import setup_model_and_geometry
+from torch.fft import irfft
 
 def get_model_shape():
     return 1630, 2640
@@ -36,7 +37,7 @@ def load_scalers(shot_ids):
     scalers = torch.empty(len(shot_ids), dtype=torch.float32, pin_memory=True)
     dir_path = PATH_WAVELETS
     for i, shot_id in enumerate(shot_ids):
-        path = f"{dir_path}/Mex_wavelet_{shot_id}_norm_scalar.npy"
+        path = f"{dir_path}/wavelet_scale_{shot_id}.npy"
         scalers[i] = torch.from_numpy(np.load(path))  # Copy forces read into memory
     
     return scalers
@@ -79,6 +80,54 @@ def calc_grad_batch(u0_batch, v_batch, dt=None):
     v_padded = torch.nn.functional.pad(v_batch, (0, 0, 0, 0, 1, 1), mode='constant', value=0)
     v_dt2 = (v_padded[:, 2:] - 2*v_padded[:, 1:-1] + v_padded[:, :-2]) / (dt**2)
     return -torch.sum(u0_batch * v_dt2, dim=1)
+
+
+def calc_grad_batch_l1(u0_batch, v_batch):
+    """Compute l1 gradient for batch using torch"""
+    return -torch.sum(u0_batch * v_batch, dim=1)
+
+
+def compute_gradient_batch_l1(shot_ids, fk_down, fk_up, dt, scalers=None):
+    """Compute gradient for a batch of shots"""
+    # Load wavefields in batch
+    u0_batch = load_wavefield_snaps_batch(shot_ids, 'forward').to('cuda')  # [B, T, X, Z]
+    v_batch = load_wavefield_snaps_batch(shot_ids, 'adjoint').to('cuda')   # [B, T, X, Z]
+    
+    # Apply filters
+    # u0_up = fk_up((u0_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)  # Back to [B, T, X, Z]
+    # u0_down = fk_down((u0_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
+    # v_up = fk_up.filter_l1((v_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
+    # v_down = fk_down.filter_l1((v_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
+    
+    # u0_up = fk_up((u0_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
+    # u0_down = fk_down((u0_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
+    # v_up = fk_up.filter_l1((v_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
+    # v_down = fk_down.filter_l1((v_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
+
+    u0_up = fk_up.filter_l1((u0_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
+    u0_down = fk_down.filter_l1((u0_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
+    v_up = fk_up((v_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
+    v_down = fk_down((v_batch).permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
+
+    # u0_up = fk_up.partial((v_batch).permute(0, 3, 2, 1), isl1=False)
+    # u0_down = fk_down.partial((v_batch).permute(0, 3, 2, 1), isl1=False)
+    # v_up = fk_up.partial((v_batch).permute(0, 3, 2, 1), isl1=True)
+    # v_down = fk_down.partial((v_batch).permute(0, 3, 2, 1), isl1=True)
+
+    # Compute gradients for each shot in batch
+    grad_up = calc_grad_batch_l1(u0_up, v_down)
+    grad_down = calc_grad_batch_l1(u0_down, v_up)
+    print(v_up.shape)
+    # grad_up = torch.sum(torch.real(u0_up*v_down), dim=-1).permute(0, 2, 1)
+    # grad_down = torch.sum(torch.real(u0_down*v_up), dim=-1).permute(0, 2, 1)
+
+    print(grad_up.shape)
+
+    if scalers is None:
+        return (grad for grad in [grad_up, grad_down])
+    else:
+        return (grad/scalers.unsqueeze(-1).unsqueeze(-1) for grad in [grad_up, grad_down])
+    # return grad_batch
 
 def main_compute_gradients_batched(iter, batch_size=4):
     """Main function to compute all gradients using batches"""
@@ -143,8 +192,8 @@ def main_compute_gradients_batched(iter, batch_size=4):
     # grad_full += torch.sum(grad_batch, dim=0)
 
     # Save results
-    np.save(f"{OUTPUT_DIRS['gradients']}/grad_full_u_{iter+1}.npy", grad_full_u.cpu().numpy())
-    np.save(f"{OUTPUT_DIRS['gradients']}/grad_full_d_{iter+1}.npy", grad_full_d.cpu().numpy())
+    np.save(f"{OUTPUT_DIRS['gradients']}/grad_full_u_{iter}.npy", grad_full_u.cpu().numpy())
+    np.save(f"{OUTPUT_DIRS['gradients']}/grad_full_d_{iter}.npy", grad_full_d.cpu().numpy())
 
     
     end = time.time()
