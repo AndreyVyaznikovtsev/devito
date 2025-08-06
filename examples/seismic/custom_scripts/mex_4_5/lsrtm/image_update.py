@@ -49,10 +49,10 @@ def update_image(iter_num):
     """Perform a single image update for the current iteration"""
     start_time = time.time()
     
-    image_current = load_image(iter_num-1)
-    image_prev = load_image(iter_num - 2) if iter_num > 1 else image_current * 0
-    grad_d_prev, grad_u_prev = load_gradient(iter_num - 1)
     grad_d, grad_u = load_gradient(iter_num)
+    grad_d_prev, grad_u_prev = load_gradient(iter_num - 1) if iter_num > 0 else (grad_d*0, grad_d*0)
+    image_current = load_image(iter_num-1) if iter_num > 0 else upsample_image(grad_d*0, *get_model_shape())
+    image_prev = load_image(iter_num - 2) if iter_num > 1 else image_current * 0
     grad = grad_u - grad_d
     grad_prev = grad_u_prev - grad_d_prev
     grad = upsample_image(grad, *get_model_shape())
@@ -78,7 +78,7 @@ def get_alfa(grad_iter,image_iter,niter_lsrtm):
     
     if niter_lsrtm == 0:
            
-        alfa = 0.3
+        alfa = -0.5
     
     else:
         abb1 = term1 / term2

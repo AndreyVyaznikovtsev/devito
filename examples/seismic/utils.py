@@ -307,7 +307,7 @@ class AcquisitionGeometry(Pickable):
 
     @property
     def r(self):
-        return self._rPr
+        return self._r
 
     @property
     def interpolation(self):

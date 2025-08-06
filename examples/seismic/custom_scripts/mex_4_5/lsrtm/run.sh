@@ -1,5 +1,5 @@
 #!/bin/bash
-MAX_ITER=30
+MAX_ITER=5
 START_ITER=0
 
 if [ "$1" != "" ]; then
@@ -28,9 +28,9 @@ for ((iter=$START_ITER; iter<$MAX_ITER; iter++)); do
     unset DEVITO_ARCH
     
     echo "Computing gradients for iteration $iter..."
-    python grad_computation.py --iter $iter --batch-size 20
+    python grad_computation.py --iter $iter --batch-size 10
     
     echo "Updating image for iteration $iter..."
     python image_update.py --iter $iter
 done
-echo "FWI workflow completed successfully."
+echo "LSRTM workflow completed successfully."

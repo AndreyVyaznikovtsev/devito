@@ -12,10 +12,10 @@ from wavefield_computation import setup_model_and_geometry
 from torch.fft import irfft
 
 def get_model_shape():
-    return 1630, 2640
+    return NUM_X, NUM_Z
 
 def get_num_shots():
-    return 59
+    return NUM_SHOTS
 
 def get_subn():
     return (el//SUBSAMPLING + 1 for el in get_model_shape())
@@ -37,7 +37,7 @@ def load_scalers(shot_ids):
     scalers = torch.empty(len(shot_ids), dtype=torch.float32, pin_memory=True)
     dir_path = PATH_WAVELETS
     for i, shot_id in enumerate(shot_ids):
-        path = f"{dir_path}/Mex_wavelet_{shot_id}_norm_scalar.npy"
+        path = f"{dir_path}/wavelet_scale_{shot_id}.npy"
         scalers[i] = torch.from_numpy(np.load(path))  # Copy forces read into memory
     
     return scalers
