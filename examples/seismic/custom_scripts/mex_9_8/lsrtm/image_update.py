@@ -5,6 +5,7 @@ import time
 from config import *
 import os
 from scipy.interpolate import interpn
+from scipy.ndimage import gaussian_filter
 import argparse
 from wavefield_computation import setup_model_and_geometry
 from grad_computation import get_subn, get_model_shape
@@ -61,7 +62,8 @@ def update_image(iter_num):
 
     sk = image_current - image_prev
     yk = grad - grad_prev
-    alpha = get_alfa(yk, sk, iter_num)
+    print(sk.shape)
+    alpha = get_alfa(yk[200:-200, 200:-200], sk[200:-200, 200:-200], iter_num)
     print('\033[1m' + f'{iter_num}. Current alpha - {alpha:.2f}' + '\033[0m')
 
     image_new = image_current - alpha*grad
@@ -75,7 +77,10 @@ def get_alfa(grad_iter,image_iter,niter_lsrtm):
     term1 = np.dot(image_iter.reshape(-1), image_iter.reshape(-1))
     term2 = np.dot(image_iter.reshape(-1), grad_iter.reshape(-1))
     term3 = np.dot(grad_iter.reshape(-1), grad_iter.reshape(-1))
-    
+    print(term1)
+    print(term2)
+    print(term3)
+
     if niter_lsrtm == 0:
            
         alfa = -0.5
@@ -84,6 +89,9 @@ def get_alfa(grad_iter,image_iter,niter_lsrtm):
         abb1 = term1 / term2
         abb2 = term2 / term3
         abb3 = abb2 / abb1
+        print(abb1)
+        print(abb2)
+        print(abb3)
         if np.abs(abb3) > 0 and np.abs(abb3) < 1:
             alfa = abb2
         else:

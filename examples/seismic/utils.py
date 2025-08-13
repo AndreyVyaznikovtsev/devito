@@ -20,14 +20,15 @@ def estimate_centroid_frequency_gather(data, dt, method="median"):
     ntraces = data.shape[1]  # Assuming data is [samples x traces]
 
     for trace in data.T:  # Process each trace separately
-        n = len(trace)
-        fft_data = np.fft.rfft(trace)
-        freqs = np.fft.rfftfreq(n, dt / 1e3)
+        if np.any(trace):
+            n = len(trace)
+            fft_data = np.fft.rfft(trace)
+            freqs = np.fft.rfftfreq(n, dt / 1e3)
 
-        power_spectrum = np.abs(fft_data) ** 2
+            power_spectrum = np.abs(fft_data) ** 2
 
-        centroid = np.sum(freqs * power_spectrum) / np.sum(power_spectrum)
-        centroids.append(centroid)
+            centroid = np.sum(freqs * power_spectrum) / np.sum(power_spectrum)
+            centroids.append(centroid)
 
     # Use median to be robust against outliers
     if method == "median":

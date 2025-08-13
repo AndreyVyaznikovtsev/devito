@@ -16,3 +16,5 @@ devito.egg-info/*
 *.sgy
 
 *.bin
+
+examples/seismic/data/*

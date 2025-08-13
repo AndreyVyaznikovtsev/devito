@@ -1,11 +1,11 @@
 import numpy as np
 import pandas as pd
-from scipy.interpolate import NearestNDInterpolator
+from scipy.interpolate import NearestNDInterpolator, interp1d
 import matplotlib.pyplot as plt
 
 
 class VelocityModel:
-    def __init__(self, path, dx, dz, clip=False, xmin=None, xmax=None, zmin=None, zmax=None):
+    def __init__(self, path, dx, dz, clip=False, xmin=None, xmax=None, zmin=None, zmax=None, invert_elevs=False):
         """
         Initialize the VelocityModel with a path to the model file.
 
@@ -25,6 +25,7 @@ class VelocityModel:
         self._xmax = xmax
         self._zmin = zmin
         self._zmax = zmax
+        self.invert_elevs = invert_elevs
 
     @property
     def path(self):
@@ -61,6 +62,8 @@ class VelocityModel:
         # Read CSV file into DataFrame
         df = pd.read_csv(self._path, sep=r"\s+")
         df_array = df.to_numpy()
+        if self.invert_elevs:
+            df_array[:, 1] *= -1
 
         ind = np.ones_like(df_array[:, 0]).astype("bool")
         if self._xmin is not None:
@@ -407,3 +410,61 @@ class VelocityModel:
             plt.show()
         else:
             return fig, axs
+
+    def create_layered_vp(self, interfaces):
+        """
+        Create layered Vp array matching current model dimensions
+        
+        Parameters:
+        interfaces : List of (x_points, z_points) tuples defining each interface
+                    x_points: Array of x coordinates
+                    z_points: Array of z/depth values at each x coordinate
+        
+        Returns:
+        Layered Vp array with same shape as current model
+        """
+        self._ensure_model_ready()
+        
+        # Get model coordinates
+        x_coords = self.x
+        z_coords = self.z
+        nz, nx = self.vp.shape
+        
+        # Initialize output array
+        layered_vp = np.zeros_like(self.vp)
+        
+        # Create interface surfaces (interpolated to model x coordinates)
+        interface_surfaces = []
+        for x_pts, z_pts in interfaces:
+            f = interp1d(x_pts, z_pts, kind='linear', fill_value="extrapolate")
+            interface_surfaces.append(f(x_coords))
+        
+        # Sort interfaces from shallowest to deepest
+        interface_surfaces.sort(key=lambda s: np.mean(s))
+        
+        # Process each layer
+        processed_mask = np.zeros((nz, nx), dtype=bool)
+        
+        for i, surface in enumerate(interface_surfaces):
+            # Create mask for points above this interface
+            above_interface = np.zeros((nz, nx), dtype=bool)
+            for ix in range(nx):
+                z_max = surface[ix]
+                iz_max = min(nz, np.argmin(np.abs(z_coords - z_max)))
+                above_interface[:iz_max, ix] = True
+            
+            # Get unprocessed points in this layer
+            current_layer = above_interface & ~processed_mask
+            
+            if np.any(current_layer):
+                # Calculate and apply mean velocity
+                mean_vp = np.mean(self.vp[current_layer])
+                layered_vp[current_layer] = mean_vp
+                processed_mask[current_layer] = True
+        
+        # Fill remaining points (below deepest interface)
+        if not np.all(processed_mask):
+            mean_vp = np.mean(self.vp[~processed_mask])
+            layered_vp[~processed_mask] = mean_vp
+        
+        return layered_vp
