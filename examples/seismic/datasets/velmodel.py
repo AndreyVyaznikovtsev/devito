@@ -459,6 +459,7 @@ class VelocityModel:
             if np.any(current_layer):
                 # Calculate and apply mean velocity
                 mean_vp = np.mean(self.vp[current_layer])
+                mean_vp = np.quantile(self.vp[current_layer], 0.6) if mean_vp > 3.0 else mean_vp
                 layered_vp[current_layer] = mean_vp
                 processed_mask[current_layer] = True
         

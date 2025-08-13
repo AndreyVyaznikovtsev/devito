@@ -21,6 +21,7 @@ class SeismogramDataset:
         sort_key: str = "sou",
         resample: bool = False,
         invert_elevs: bool = False,
+        monkey_x = False,
     ):
         """
         Инициализация датасета с файлом SEG-Y и ключом сортировки.
@@ -38,6 +39,7 @@ class SeismogramDataset:
         self._dt_r = None  # Target sample interval for resampling
         self._t_max_r = None  # Maximum time for resampling
         self._invert_elevs = invert_elevs
+        self.monkey_x = monkey_x
 
         # Открытие файла и чтение заголовков
         with segyio.open(sgy_path, ignore_geometry=True) as f:
@@ -68,6 +70,9 @@ class SeismogramDataset:
                 self.opposite_elev = np.array(
                     [f.header[trace][TraceField.SourceSurfaceElevation] / elevation_scalar for trace in range(f.tracecount)]
                 )
+
+            if self.monkey_x:
+                self.x_coords[self.x_coords>10.8] -= 0.4
 
             if self._invert_elevs:
                 self.elevations *= -1
