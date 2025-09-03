@@ -1,0 +1,29 @@
+\documentclass{article}
+\usepackage{amsmath} % Provides the \Box command and better math formatting
+\usepackage{physics} % Provides the \laplacian command (optional but useful)
+
+\begin{document}
+
+Основой любого алгоритма имейджинга является волновое уравнение. Все алгоритмы, используемые в работе, построены на акустическом волновом уравнении:
+\[
+\frac{1}{v_p^2(\mathbf{x})} \frac{\partial^2 p(\mathbf{x}, t)}{\partial t^2} - \nabla^2 p(\mathbf{x}, t) = f(\mathbf{x}, t)
+\]
+
+Или, в операторном виде: 
+
+% Operator Form using \Box
+It can be written compactly in operator form using the d'Alembert operator $\Box$:
+\[
+\mathcal{L} \, \mathcal{p} = \mathcal{f}
+\]
+where
+\[
+\mathcal{L} \equiv \frac{1}{v_p^2} \frac{\partial^2}{\partial t^2} - \nabla^2
+\]
+
+Alternative using \laplacian from physics package
+\[
+\frac{1}{v_p^2} \frac{\partial^2 p}{\partial t^2} - \laplacian{p} = f
+\]
+
+\end{document}

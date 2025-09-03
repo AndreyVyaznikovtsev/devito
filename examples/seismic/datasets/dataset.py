@@ -246,6 +246,8 @@ class SeismogramDataset:
         db_scale: bool = True,
         min_freq: float = None,
         max_freq: float = None,
+        axs = None,
+        axkwargs = None,
     ):
         """
         Plots the mean amplitude spectrum of traces in the specified gather.
@@ -275,27 +277,32 @@ class SeismogramDataset:
         # Convert to dB if requested
         if db_scale:
             mean_spectrum = 20 * np.log10(mean_spectrum)
-            ylabel = "Amplitude (dB)"
-        else:
-            ylabel = "Amplitude"
 
-        # Plot
-        plt.figure(figsize=figsize)
-        plt.plot(frequencies, mean_spectrum)
+        c = axkwargs.pop("color", "K")
+        label = axkwargs.pop("label", None)
+        if axs is None:
+            # Plot
+            _, axs = plt.subplots(1, 1, figsize=figsize)
+        axs.plot(frequencies, mean_spectrum, color=c, label=label)
 
         # Set frequency limits if specified
         if min_freq is not None or max_freq is not None:
             current_xlim = plt.xlim()
             new_min = min_freq if min_freq is not None else current_xlim[0]
             new_max = max_freq if max_freq is not None else current_xlim[1]
-            plt.xlim(new_min, new_max)
+            axs.set_xlim([new_min, new_max])
 
-        plt.xlabel("Frequency (Hz)")
-        plt.ylabel(ylabel)
+        xlabel = axkwargs.pop("xlabel", "Frequency (Hz)")
+        axs.set_xlabel(xlabel)
+        ylabel = axkwargs.pop("ylabel", "Amplitude")
+        axs.set_ylabel(ylabel)
         title_type = "ОПВ" if self.sort_key == "sou" else "ОПП"
-        plt.title(f"Mean amplitude spectrum of {title_type} gather #{idx}")
-        plt.grid(True)
-        plt.show()
+        # axs.set_title(f"Mean amplitude spectrum of {title_type} gather #{idx}")
+        ylim = axkwargs.pop("ylim", None)
+        if ylim is not None:
+            axs.set_ylim(ylim)
+        axs.grid(True)
+        # plt.show()
 
     def plot_spectrum_map(
         self,

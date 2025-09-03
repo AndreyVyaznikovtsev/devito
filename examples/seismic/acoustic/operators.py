@@ -143,6 +143,48 @@ def ForwardOperator(model, geometry, space_order=4, save=False, kernel="OT2", **
         stencils += [Eq(usave, u)]
     return Operator(stencils, subs=model.spacing_map, name="Forward", opt=("advanced", {"gpu-fit": usave if save else None}), **kwargs)
 
+def ForwardOperatorUnt(model, geometry, space_order=4,
+                    save=False, kernel='OT2', **kwargs):
+    """
+    Construct a forward modelling operator in an acoustic medium.
+
+    Parameters
+    ----------
+    model : Model
+        Object containing the physical parameters.
+    geometry : AcquisitionGeometry
+        Geometry object that contains the source (SparseTimeFunction) and
+        receivers (SparseTimeFunction) and their position.
+    space_order : int, optional
+        Space discretization order.
+    save : int or Buffer, optional
+        Saving flag, True saves all time steps. False saves three timesteps.
+        Defaults to False.
+    kernel : str, optional
+        Type of discretization, 'OT2' or 'OT4'.
+    """
+    m = model.m
+
+    # Create symbols for forward wavefield, source and receivers
+    u = TimeFunction(name='u', grid=model.grid,
+                     save=geometry.nt if save else None,
+                     time_order=2, space_order=space_order)
+    src = geometry.src
+    rec = geometry.rec
+
+    s = model.grid.stepping_dim.spacing
+    eqn = iso_stencil(u, model, kernel)
+
+    # Construct expression to inject source values
+    src_term = src.inject(field=u.forward, expr=src * s**2 / m)
+
+    # Create interpolation expression for receivers
+    rec_term = rec.interpolate(expr=u)
+
+    # Substitute spacing terms to reduce flops
+    return Operator(eqn + src_term + rec_term, subs=model.spacing_map,
+                    name='Forward', **kwargs)
+
 
 def AdjointOperator(model, geometry, save=None, space_order=4, kernel="OT2", **kwargs):
     """
@@ -274,7 +316,7 @@ def BornOperator(model, geometry, space_order=4, kernel="OT2", **kwargs):
 
     s = model.grid.stepping_dim.spacing
     eqn1 = iso_stencil(u, model, kernel)
-    eqn2 = iso_stencil(U, model, kernel, q=-dm * u.dt2)
+    eqn2 = iso_stencil(U, model, kernel, q=-dm * m * u.dt2)
 
     # Add source term expression for u
     source = src.inject(field=u.forward, expr=src * s**2 / m)

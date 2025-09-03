@@ -240,7 +240,7 @@ def plot_seis_double_hor(seis1, seis2, time_range, z, titles, show=False):
         return fig, axs
 
 
-def plot_perturbation(model, model1, colorbar=True):
+def plot_perturbation(model, model1, colorbar=True, ax=None, ti=None):
     """
     Plot a two-dimensional velocity perturbation from two seismic `Model`
     objects.
@@ -254,37 +254,39 @@ def plot_perturbation(model, model1, colorbar=True):
     colorbar : bool
         Option to plot the colorbar.
     """
-    domain_size = 1.0e-3 * np.array(model.domain_size)
+    domain_size = 1.0 * np.array(model.domain_size)
     extent = [
         model.origin[0],
         model.origin[0] + domain_size[0],
         model.origin[1] + domain_size[1],
         model.origin[1],
     ]
-    dv = np.transpose(model.vp.data) - np.transpose(model1.vp.data)
+    dv = np.array(np.transpose(model.vp.data) - np.transpose(model1.vp.data))
+    slices = (slice(None, -model.nbl), slice(model.nbl, -model.nbl)) if model.fs else (slice(model.nbl, -model.nbl), slice(model.nbl, -model.nbl))
 
-    plot = plt.imshow(
-        dv,
+    if ax is None:
+        fig, ax = plt.subplots(1, 1)
+
+    plot = ax.imshow(
+        dv[slices],
         animated=True,
         cmap=cm.jet,
         vmin=min(dv.reshape(-1)),
         vmax=max(dv.reshape(-1)),
         extent=extent,
     )
-    plt.xlabel("X position (km)")
-    plt.ylabel("Depth (km)")
+    ax.set_xlabel("Расстояние, м")
+    ax.set_ylabel("Глубина, м")
 
     # Create aligned colorbar on the right
     if colorbar:
-        ax = plt.gca()
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="5%", pad=0.05)
         cbar = plt.colorbar(plot, cax=cax)
-        cbar.set_label("Velocity perturbation (km/s)")
-    plt.show()
+        cbar.set_label(r"Отклонение $V_p$, км/с") if ti is None else cbar.set_label(ti)
 
 
-def plot_velocity(model, source=None, receiver=None, colorbar=True, cmap="jet"):
+def plot_velocity(model, source=None, receiver=None, colorbar=True, cmap="jet", ax=None):
     """
     Plot a two-dimensional velocity field from a seismic `Model`
     object. Optionally also includes point markers for sources and receivers.
@@ -313,7 +315,10 @@ def plot_velocity(model, source=None, receiver=None, colorbar=True, cmap="jet"):
         field = model.vp.data[slices]
     else:
         field = model.lam.data[slices]
-    plot = plt.imshow(
+
+    if ax is None:
+        fig, ax = plt.subplots(1, 1)
+    plot = ax.imshow(
         np.transpose(field),
         animated=True,
         cmap=cmap,
@@ -321,32 +326,30 @@ def plot_velocity(model, source=None, receiver=None, colorbar=True, cmap="jet"):
         vmax=np.max(field),
         extent=extent,
     )
-    plt.xlabel("X position (km)")
-    plt.ylabel("Depth (km)")
+    ax.set_xlabel("Расстояние, м")
+    ax.set_ylabel("Глубина, м")
 
     # Plot source points, if provided
     if receiver is not None:
-        plt.scatter(receiver[:, 0], receiver[:, 1], s=25, c="green", marker="D")
+        ax.scatter(receiver[:, 0], receiver[:, 1], s=25, c="green", marker="D")
 
     # Plot receiver points, if provided
     if source is not None:
-        plt.scatter(source[:, 0], source[:, 1], s=25, c="red", marker="o")
+        ax.scatter(source[:, 0], source[:, 1], s=25, c="red", marker="o")
 
     # Ensure axis limits
-    plt.xlim(model.origin[0], model.origin[0] + domain_size[0])
-    plt.ylim(model.origin[1] + domain_size[1], model.origin[1])
+    ax.set_xlim(model.origin[0], model.origin[0] + domain_size[0])
+    ax.set_ylim(model.origin[1] + domain_size[1], model.origin[1])
 
     # Create aligned colorbar on the right
     if colorbar:
-        ax = plt.gca()
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="5%", pad=0.05)
         cbar = plt.colorbar(plot, cax=cax)
-        cbar.set_label("Velocity (km/s)")
-    plt.show()
+        cbar.set_label(r"$V_p$, км/с")
 
 
-def plot_shotrecord(rec, t0, tn, colorbar=True):
+def plot_shotrecord(rec, extent, ax, ti, scale=None):
     """
     Plot a shot record (receiver values over time).
 
@@ -361,29 +364,26 @@ def plot_shotrecord(rec, t0, tn, colorbar=True):
     tn : int
         End of time dimension to plot.
     """
-    scale = np.max(rec) / 5.0
+    rec = np.array(rec)
+    scale = np.quantile(rec, 0.98) if scale is None else scale
     # extent = [model.origin[0], model.origin[0] + 1e-3*model.domain_size[0],
     #   model.origin[1] + 1e-3*model.domain_size[1], model.origin[1]]
     print(rec.shape)
-    plot = plt.imshow(rec.T, vmin=-scale, vmax=scale, cmap=cm.gray, aspect="auto")
-    plt.xlabel("X position (km)")
-    plt.ylabel("Y position (km)")
+    plot = ax.imshow(rec.T, vmin=-scale, vmax=scale, cmap=cm.gray, aspect="auto", extent=extent)
+    ax.set_xlabel("Глубина ПП, м")
+    ax.set_ylabel("Время, мс")
     # major_ticks = np.arange(0, rec.shape[0], 500)
-    ax = plt.gca()
     # ax.set_xticks(major_ticks)
     # ax.set_yticks(major_ticks)
-    plt.grid()
-
-    # Create aligned colorbar on the right
-    if colorbar:
-        ax = plt.gca()
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        plt.colorbar(plot, cax=cax)
-    plt.show()
+    ax.grid()
+    ax.set_title(ti)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(plot, cax=cax)
+    return ax
 
 
-def plot_image(data, vmin=None, vmax=None, colorbar=True, cmap="gray"):
+def plot_image(data, vmin=None, vmax=None, colorbar=True, cmap="gray", ax=None):
     """
     Plot image data, such as RTM images or FWI gradients.
 
@@ -395,7 +395,9 @@ def plot_image(data, vmin=None, vmax=None, colorbar=True, cmap="gray"):
         Choice of colormap. Defaults to gray scale for images as a
         seismic convention.
     """
-    plot = plt.imshow(
+    if ax is None:
+        ax = plt.gca()
+    plot = ax.imshow(
         np.transpose(data),
         vmin=vmin or 0.9 * np.min(data),
         vmax=vmax or 1.1 * np.max(data),
@@ -404,8 +406,7 @@ def plot_image(data, vmin=None, vmax=None, colorbar=True, cmap="gray"):
 
     # Create aligned colorbar on the right
     if colorbar:
-        ax = plt.gca()
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="5%", pad=0.05)
         plt.colorbar(plot, cax=cax)
-    plt.show()
+    return ax

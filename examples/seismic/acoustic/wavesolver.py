@@ -2,6 +2,7 @@ from devito import Function, TimeFunction, ConditionalDimension, DevitoCheckpoin
 from devito.tools import memoized_meth
 from examples.seismic.acoustic.operators import (
     ForwardOperator,
+    ForwardOperatorUnt,
     AdjointOperator,
     GradientOperator,
     BornOperator,
@@ -60,6 +61,13 @@ class AcousticWaveSolver:
             space_order=self.space_order,
             **self._kwargs,
         )
+
+    @memoized_meth
+    def op_fwd_unt(self, save=None):
+        """Cached operator for forward runs with buffered wavefield"""
+        return ForwardOperatorUnt(self.model, save=save, geometry=self.geometry,
+                               kernel=self.kernel, space_order=self.space_order,
+                               **self._kwargs)
 
     @memoized_meth
     def op_adj(self, save=None):
@@ -160,6 +168,51 @@ class AcousticWaveSolver:
         else:
             summary = self.op_fwd().apply(src=src, rec=rec, u=u, dt=dt, **kwargs)
             return rec, u, summary
+
+    def forward_untouched(self, src=None, rec=None, u=None, model=None, save=None, **kwargs):
+        """
+        Forward modelling function that creates the necessary
+        data objects for running a forward modelling operator.
+
+        Parameters
+        ----------
+        src : SparseTimeFunction or array_like, optional
+            Time series data for the injected source term.
+        rec : SparseTimeFunction or array_like, optional
+            The interpolated receiver data.
+        u : TimeFunction, optional
+            Stores the computed wavefield.
+        model : Model, optional
+            Object containing the physical parameters.
+        vp : Function or float, optional
+            The time-constant velocity.
+        save : bool, optional
+            Whether or not to save the entire (unrolled) wavefield.
+
+        Returns
+        -------
+        Receiver, wavefield and performance summary
+        """
+        # Source term is read-only, so re-use the default
+        src = src or self.geometry.src
+        # Create a new receiver object to store the result
+        rec = rec or self.geometry.rec
+
+        # Create the forward wavefield if not provided
+        u = u or TimeFunction(name='u', grid=self.model.grid,
+                              save=self.geometry.nt if save else None,
+                              time_order=2, space_order=self.space_order)
+
+        model = model or self.model
+        # Pick vp from model unless explicitly provided
+        kwargs.update(model.physical_params(**kwargs))
+
+        # Execute operator and return wavefield and receiver data
+        summary = self.op_fwd_unt(save).apply(src=src, rec=rec, u=u,
+                                          dt=kwargs.pop('dt', self.dt), **kwargs)
+
+        return rec, u, summary
+
 
     def adjoint(self, rec, srca=None, v=None, model=None, **kwargs):
         """

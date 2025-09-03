@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from scipy.interpolate import NearestNDInterpolator, interp1d
+from scipy.interpolate import NearestNDInterpolator, interp1d, LinearNDInterpolator
 import matplotlib.pyplot as plt
 
 
@@ -89,8 +89,10 @@ class VelocityModel:
 
         # Create interpolators for irregular grid
         points = np.column_stack((x_coords, z_coords))
-        vel_interp = NearestNDInterpolator(points, vel_values)
-        vxvz_interp = NearestNDInterpolator(points, vxvz_values)
+        vel_interp_linear = LinearNDInterpolator(points, vel_values)
+        vel_interp_nearest = NearestNDInterpolator(points, vel_values)
+        vxvz_interp_linear = LinearNDInterpolator(points, vxvz_values)
+        vxvz_interp_nearest = NearestNDInterpolator(points, vxvz_values)
 
         # Determine grid boundaries
         x_min, x_max = np.min(x_coords), np.max(x_coords)
@@ -102,8 +104,10 @@ class VelocityModel:
         new_xx, new_zz = np.meshgrid(new_x, new_z, indexing="xy")
 
         # Interpolate onto regular grid
-        new_vel = vel_interp(new_xx, new_zz)
-        new_vxvz = vxvz_interp(new_xx, new_zz)
+        new_vel = vel_interp_linear(new_xx, new_zz)
+        new_vel[np.isnan(new_vel)] = vel_interp_nearest(new_xx[np.isnan(new_vel)], new_zz[np.isnan(new_vel)])
+        new_vxvz = vxvz_interp_linear(new_xx, new_zz)
+        new_vxvz[np.isnan(new_vxvz)] = vxvz_interp_nearest(new_xx[np.isnan(new_vxvz)], new_zz[np.isnan(new_vxvz)])
 
         self._current_model = {
             "vel": new_vel,
@@ -116,81 +120,49 @@ class VelocityModel:
 
         self._model_loaded = True
 
-    def _interpolate_model(self):
-        """Interpolate the model to new grid spacing if needed"""
-        if not self._base_model_loaded:
-            self._load_base_model()
-
-        if self._dx is None and self._dz is None:
-            # No interpolation needed
-            self._current_model = {
-                "vel": self._vel_padded,
-                "vxvz": self._vxvz_padded,
-                "x": self._original_x,
-                "z": self._original_z,
-                "dx": self._original_dx,
-                "dz": self._original_dz,
-            }
-            return
-
-        # Determine new grid dimensions and coordinates
-        x_min, x_max = self._original_x[0], self._original_x[-1]
-        z_min, z_max = self._original_z[0], self._original_z[-1]
-
-        dx = self._original_dx if self._dx is None else self._dx
-        dz = self._original_dz if self._dz is None else self._dz
-
-        new_x = np.arange(x_min, x_max + dx, dx)
-        new_z = np.arange(z_min, z_max + dz, dz)
-
-        # Create grid points for interpolation
-        xx, zz = np.meshgrid(self._original_x, self._original_z, indexing="xy")
-        points = np.column_stack((xx.ravel(), zz.ravel()))
-
-        # Create interpolators
-        vel_interp = NearestNDInterpolator(points, self._vel_padded.ravel())
-        vxvz_interp = NearestNDInterpolator(points, self._vxvz_padded.ravel())
-
-        # Create new grid for evaluation
-        new_xx, new_zz = np.meshgrid(new_x, new_z, indexing="xy")
-        new_points = np.column_stack((new_xx.ravel(), new_zz.ravel()))
-
-        # Interpolate
-        new_vel = vel_interp(new_points).reshape(len(new_z), len(new_x))
-        new_vxvz = vxvz_interp(new_points).reshape(len(new_z), len(new_x))
-
-        self._current_model = {
-            "vel": new_vel,
-            "vxvz": new_vxvz,
-            "x": new_x,
-            "z": new_z,
-            "dx": dx,
-            "dz": dz,
-        }
-
-        self._interpolated = True
 
     def _ensure_model_ready(self):
         """Ensure the model is loaded and interpolated"""
         if not self._model_loaded:
             self._load_and_interpolate_model()
 
-    @property
-    def vp(self):
-        self._ensure_model_ready()
-        epsilon = self._current_model["vxvz"] - 1
-        epsilon[epsilon < 0] = 0.0
-        return (2 * self._current_model["vel"]) / (2 + epsilon)
-        # vp = self._current_model['vel'] * 0 + 2.5
-        # vp[:vp.shape[0]//2, :] = 3.5
-        # return vp
+
+    # @property
+    # def vp(self):
+    #     self._ensure_model_ready()
+    #     epsilon = 0.5*(self._current_model["vxvz"]**2 - 1)
+    #     epsilon[epsilon < 0] = 0.0
+    #     # return (2 * self._current_model["vel"]) / (2 + epsilon)
+    #     return (2 * self._current_model["vel"]) / (1 + self._current_model["vxvz"])
+    
+    #     # vp = self._current_model['vel'] * 0 + 2.5
+    #     # vp[:vp.shape[0]//2, :] = 3.5
+    #     # return vp
 
     @property
     def epsilon(self):
         self._ensure_model_ready()
-        epsilon = self._current_model["vxvz"] - 1
+        epsilon = 0.5*(self._current_model["vxvz"]**2 - 1)
         epsilon[epsilon < 0] = 0.0
         return epsilon
+
+    @property
+    def vp(self):
+        self._ensure_model_ready()
+        epsilon = self.epsilon
+        epsilon[epsilon < 0] = 0.0
+        return (2 * self._current_model["vel"]) / (1 + self._current_model["vxvz"])
+
+        # vp = self._current_model['vel'] * 0 + 2.5
+        # vp[:vp.shape[0]//2, :] = 3.5
+        # return vp
+
+    # @property
+    # def epsilon(self):
+    #     self._ensure_model_ready()
+    #     epsilon = self._current_model["vxvz"] - 1
+    #     epsilon[epsilon < 0] = 0.0
+    #     return epsilon
 
     @property
     def delta(self):
@@ -356,6 +328,7 @@ class VelocityModel:
         title=r"Модель скорости продольных волн",
         dpi=200,
         figsize=(5, 10),
+        axs = None
     ):
         """
         Plot the velocity model parameters (Vp, epsilon, delta) using imshow
@@ -372,7 +345,10 @@ class VelocityModel:
         self._ensure_model_ready()
 
         # Create figure and axes
-        fig, axs = plt.subplots(1, 1, dpi=dpi, figsize=figsize)
+        if axs is None:
+            fig, axs = plt.subplots(1, 1, dpi=dpi, figsize=figsize)
+        else:
+            fig = plt.gcf()
         axs = [axs]
         plt.subplots_adjust(wspace=0.01)
 
@@ -397,15 +373,15 @@ class VelocityModel:
         axs[0].set_ylabel(r"Абс. отм., м", fontsize=12)
         for ax, handle, param in zip(axs, handles, params):
             ax.set_xlabel(r"Расстояние, м", fontsize=12)
-            cbar = fig.colorbar(handle, shrink=0.4, pad=0.02, ax=ax)
-            cbar.ax.get_yaxis().labelpad = 10
-            cbar.ax.set_ylabel(param, rotation=90)
+            # cbar = fig.colorbar(handle, shrink=0.4, pad=0.02, ax=ax)
+            # cbar.ax.get_yaxis().labelpad = 10
+            # cbar.ax.set_ylabel(param, rotation=90)
 
         ax.set_title(
             title,
             fontsize=14,
         )
-        plt.tight_layout()
+        # plt.tight_layout()
         if show:
             plt.show()
         else:

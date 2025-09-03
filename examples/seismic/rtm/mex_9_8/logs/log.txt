@@ -1,0 +1,10 @@
+Iteration 0: Final Objective = 1628.28002930
+Iteration 1: Final Objective = 1574.32763672
+Iteration 2: Final Objective = 1514.50854492
+Iteration 3: Final Objective = 1478.54980469
+Iteration 4: Final Objective = 1472.81665039
+Iteration 5: Final Objective = 1486.08435059
+Iteration 6: Final Objective = 1508.75134277
+Iteration 7: Final Objective = 1526.35559082
+Iteration 8: Final Objective = 1540.03466797
+Iteration 9: Final Objective = 1548.25256348

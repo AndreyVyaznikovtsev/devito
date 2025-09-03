@@ -1,0 +1,2127 @@
+This is pdfTeX, Version 3.141592653-2.6-1.40.28 (TeX Live 2025) (preloaded format=pdflatex 2025.8.27)  31 AUG 2025 15:42
+entering extended mode
+ restricted \write18 enabled.
+ file:line:error style messages enabled.
+ %&-line parsing enabled.
+**/home/andrey/devito-vti/examples/equations/acoustic.tex
+(/home/andrey/devito-vti/examples/equations/acoustic.tex
+LaTeX2e <2025-06-01> patch level 1
+L3 programming layer <2025-08-13>
+(/usr/local/texlive/2025/texmf-dist/tex/latex/base/article.cls
+Document Class: article 2025/01/22 v1.4n Standard LaTeX document class
+(/usr/local/texlive/2025/texmf-dist/tex/latex/base/size10.clo
+File: size10.clo 2025/01/22 v1.4n Standard LaTeX file (size option)
+)
+\c@part=\count275
+\c@section=\count276
+\c@subsection=\count277
+\c@subsubsection=\count278
+\c@paragraph=\count279
+\c@subparagraph=\count280
+\c@figure=\count281
+\c@table=\count282
+\abovecaptionskip=\skip49
+\belowcaptionskip=\skip50
+\bibindent=\dimen148
+) (/usr/local/texlive/2025/texmf-dist/tex/latex/amsmath/amsmath.sty
+Package: amsmath 2025/06/16 v2.17y AMS math features
+\@mathmargin=\skip51
+
+For additional information on amsmath, use the `?' option.
+(/usr/local/texlive/2025/texmf-dist/tex/latex/amsmath/amstext.sty
+Package: amstext 2024/11/17 v2.01 AMS text
+ (/usr/local/texlive/2025/texmf-dist/tex/latex/amsmath/amsgen.sty
+File: amsgen.sty 1999/11/30 v2.0 generic functions
+\@emptytoks=\toks17
+\ex@=\dimen149
+)) (/usr/local/texlive/2025/texmf-dist/tex/latex/amsmath/amsbsy.sty
+Package: amsbsy 1999/11/29 v1.2d Bold Symbols
+\pmbraise@=\dimen150
+) (/usr/local/texlive/2025/texmf-dist/tex/latex/amsmath/amsopn.sty
+Package: amsopn 2022/04/08 v2.04 operator names
+)
+\inf@bad=\count283
+LaTeX Info: Redefining \frac on input line 233.
+\uproot@=\count284
+\leftroot@=\count285
+LaTeX Info: Redefining \overline on input line 398.
+LaTeX Info: Redefining \colon on input line 409.
+\classnum@=\count286
+\DOTSCASE@=\count287
+LaTeX Info: Redefining \ldots on input line 495.
+LaTeX Info: Redefining \dots on input line 498.
+LaTeX Info: Redefining \cdots on input line 619.
+\Mathstrutbox@=\box53
+\strutbox@=\box54
+LaTeX Info: Redefining \big on input line 721.
+LaTeX Info: Redefining \Big on input line 722.
+LaTeX Info: Redefining \bigg on input line 723.
+LaTeX Info: Redefining \Bigg on input line 724.
+\big@size=\dimen151
+LaTeX Font Info:    Redeclaring font encoding OML on input line 742.
+LaTeX Font Info:    Redeclaring font encoding OMS on input line 743.
+\macc@depth=\count288
+LaTeX Info: Redefining \bmod on input line 904.
+LaTeX Info: Redefining \pmod on input line 909.
+LaTeX Info: Redefining \smash on input line 939.
+LaTeX Info: Redefining \relbar on input line 969.
+LaTeX Info: Redefining \Relbar on input line 970.
+\c@MaxMatrixCols=\count289
+\dotsspace@=\muskip17
+\c@parentequation=\count290
+\dspbrk@lvl=\count291
+\tag@help=\toks18
+\row@=\count292
+\column@=\count293
+\maxfields@=\count294
+\andhelp@=\toks19
+\eqnshift@=\dimen152
+\alignsep@=\dimen153
+\tagshift@=\dimen154
+\tagwidth@=\dimen155
+\totwidth@=\dimen156
+\lineht@=\dimen157
+\@envbody=\toks20
+\multlinegap=\skip52
+\multlinetaggap=\skip53
+\mathdisplay@stack=\toks21
+LaTeX Info: Redefining \[ on input line 2949.
+LaTeX Info: Redefining \] on input line 2950.
+) (/usr/local/texlive/2025/texmf-dist/tex/latex/physics/physics.sty
+Package: physics 
+ (/usr/local/texlive/2025/texmf-dist/tex/latex/l3packages/xparse/xparse.sty (/usr/local/texlive/2025/texmf-dist/tex/latex/l3kernel/expl3.sty
+Package: expl3 2025-08-13 L3 programming layer (loader) 
+ (/usr/local/texlive/2025/texmf-dist/tex/latex/l3backend/l3backend-pdftex.def
+File: l3backend-pdftex.def 2025-06-09 L3 backend support: PDF output (pdfTeX)
+\l__color_backend_stack_int=\count295
+))
+Package: xparse 2024-08-16 L3 Experimental document command parser
+)) (./acoustic.aux)
+\openout1 = `acoustic.aux'.
+
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 5.
+LaTeX Font Info:    ... okay on input line 5.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 5.
+LaTeX Font Info:    ... okay on input line 5.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 5.
+LaTeX Font Info:    ... okay on input line 5.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 5.
+LaTeX Font Info:    ... okay on input line 5.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 5.
+LaTeX Font Info:    ... okay on input line 5.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 5.
+LaTeX Font Info:    ... okay on input line 5.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 5.
+LaTeX Font Info:    ... okay on input line 5.
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character О (U+041E)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 О
+      сновой любого алгоритма имейджинга яв...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character с (U+0441)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 Ос
+        новой любого алгоритма имейджинга яв...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character н (U+043D)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 Осн
+          овой любого алгоритма имейджинга яв...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character о (U+043E)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 Осно
+            вой любого алгоритма имейджинга яв...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character в (U+0432)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 Основ
+              ой любого алгоритма имейджинга яв...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character о (U+043E)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 Осново
+                й любого алгоритма имейджинга яв...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character й (U+0439)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 Основой
+                   любого алгоритма имейджинга яв...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character л (U+043B)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 Основой л
+                     юбого алгоритма имейджинга яв...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character ю (U+044E)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 Основой лю
+                       бого алгоритма имейджинга яв...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character б (U+0431)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 Основой люб
+                         ого алгоритма имейджинга яв...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character о (U+043E)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 Основой любо
+                           го алгоритма имейджинга яв...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character г (U+0433)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 Основой любог
+                             о алгоритма имейджинга яв...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character о (U+043E)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 Основой любого
+                                алгоритма имейджинга яв...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character а (U+0430)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 Основой любого а
+                                  лгоритма имейджинга яв...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character л (U+043B)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 Основой любого ал
+                                    горитма имейджинга яв...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character г (U+0433)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 Основой любого алг
+                                      оритма имейджинга яв...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character о (U+043E)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 Основой любого алго
+                                        ритма имейджинга яв...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character р (U+0440)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 Основой любого алгор
+                                          итма имейджинга яв...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character и (U+0438)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 Основой любого алгори
+                                            тма имейджинга яв...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character т (U+0442)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 Основой любого алгорит
+                                              ма имейджинга яв...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character м (U+043C)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 Основой любого алгоритм
+                                                а имейджинга яв...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character а (U+0430)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 Основой любого алгоритма
+                                                   имейджинга яв...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character и (U+0438)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...овой любого алгоритма и
+                                                  мейджинга явл�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character м (U+043C)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...вой любого алгоритма им
+                                                  ейджинга явля�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character е (U+0435)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...ой любого алгоритма име
+                                                  йджинга являе�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character й (U+0439)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...й любого алгоритма имей
+                                                  джинга являет�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character д (U+0434)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ... любого алгоритма имейд
+                                                  жинга являетс�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character ж (U+0436)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�юбого алгоритма имейдж
+                                                  инга является ...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character и (U+0438)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�бого алгоритма имейджи
+                                                  нга является в...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character н (U+043D)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�ого алгоритма имейджин
+                                                  га является во...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character г (U+0433)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�го алгоритма имейджинг
+                                                  а является вол...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character а (U+0430)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�о алгоритма имейджинга
+                                                   является волн...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character я (U+044F)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ... алгоритма имейджинга я
+                                                  вляется волно�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character в (U+0432)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�лгоритма имейджинга яв
+                                                  ляется волнов�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character л (U+043B)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�горитма имейджинга явл
+                                                  яется волново�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character я (U+044F)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�оритма имейджинга явля
+                                                  ется волновое ...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character е (U+0435)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�ритма имейджинга являе
+                                                  тся волновое у...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character т (U+0442)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�итма имейджинга являет
+                                                  ся волновое ур...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character с (U+0441)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�тма имейджинга являетс
+                                                  я волновое ура...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character я (U+044F)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�ма имейджинга является
+                                                   волновое урав...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character в (U+0432)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...а имейджинга является в
+                                                  олновое уравн�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character о (U+043E)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ... имейджинга является во
+                                                  лновое уравне�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character л (U+043B)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�мейджинга является вол
+                                                  новое уравнен�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character н (U+043D)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�ейджинга является волн
+                                                  овое уравнени�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character о (U+043E)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�йджинга является волно
+                                                  вое уравнение....
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character в (U+0432)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�джинга является волнов
+                                                  ое уравнение. �...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character о (U+043E)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�жинга является волново
+                                                  е уравнение. В�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character е (U+0435)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�инга является волновое
+                                                   уравнение. Вс�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character у (U+0443)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...нга является волновое у
+                                                  равнение. Все �...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character р (U+0440)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...га является волновое ур
+                                                  авнение. Все а�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character а (U+0430)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...а является волновое ура
+                                                  внение. Все ал�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character в (U+0432)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ... является волновое урав
+                                                  нение. Все алг�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character н (U+043D)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�вляется волновое уравн
+                                                  ение. Все алго�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character е (U+0435)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�ляется волновое уравне
+                                                  ние. Все алгор�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character н (U+043D)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�яется волновое уравнен
+                                                  ие. Все алгори�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character и (U+0438)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�ется волновое уравнени
+                                                  е. Все алгорит�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character е (U+0435)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�тся волновое уравнение
+                                                  . Все алгоритм�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character В (U+0412)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�я волновое уравнение. В
+                                                  се алгоритмы, �...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character с (U+0441)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...� волновое уравнение. Вс
+                                                  е алгоритмы, и�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character е (U+0435)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...волновое уравнение. Все
+                                                   алгоритмы, ис�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character а (U+0430)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�лновое уравнение. Все а
+                                                  лгоритмы, испо...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character л (U+043B)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�новое уравнение. Все ал
+                                                  горитмы, испол...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character г (U+0433)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�овое уравнение. Все алг
+                                                  оритмы, исполь...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character о (U+043E)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�вое уравнение. Все алго
+                                                  ритмы, использ...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character р (U+0440)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�ое уравнение. Все алгор
+                                                  итмы, использу...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character и (U+0438)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�е уравнение. Все алгори
+                                                  тмы, используе...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character т (U+0442)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...� уравнение. Все алгорит
+                                                  мы, используем...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character м (U+043C)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...уравнение. Все алгоритм
+                                                  ы, используемы...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character ы (U+044B)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...равнение. Все алгоритмы
+                                                  , используемые...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character и (U+0438)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...внение. Все алгоритмы, и
+                                                  спользуемые в ...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character с (U+0441)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...нение. Все алгоритмы, ис
+                                                  пользуемые в р...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character п (U+043F)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...ение. Все алгоритмы, исп
+                                                  ользуемые в ра...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character о (U+043E)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...ние. Все алгоритмы, испо
+                                                  льзуемые в раб...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character л (U+043B)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...ие. Все алгоритмы, испол
+                                                  ьзуемые в рабо...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character ь (U+044C)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...е. Все алгоритмы, исполь
+                                                  зуемые в работ...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character з (U+0437)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 .... Все алгоритмы, использ
+                                                  уемые в работе...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character у (U+0443)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...Все алгоритмы, использу
+                                                  емые в работе, ...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character е (U+0435)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...се алгоритмы, используе
+                                                  мые в работе, п...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character м (U+043C)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...е алгоритмы, используем
+                                                  ые в работе, по...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character ы (U+044B)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ... алгоритмы, используемы
+                                                  е в работе, пос...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character е (U+0435)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�лгоритмы, используемые
+                                                   в работе, пост...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character в (U+0432)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...горитмы, используемые в
+                                                   работе, постр�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character р (U+0440)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�ритмы, используемые в р
+                                                  аботе, построе...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character а (U+0430)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�итмы, используемые в ра
+                                                  боте, построен...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character б (U+0431)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�тмы, используемые в раб
+                                                  оте, построены...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character о (U+043E)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�мы, используемые в рабо
+                                                  те, построены �...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character т (U+0442)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�ы, используемые в работ
+                                                  е, построены н�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character е (U+0435)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�, используемые в работе
+                                                  , построены на ...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character п (U+043F)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�спользуемые в работе, п
+                                                  остроены на ак...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character о (U+043E)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�пользуемые в работе, по
+                                                  строены на аку...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character с (U+0441)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�ользуемые в работе, пос
+                                                  троены на акус...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character т (U+0442)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�льзуемые в работе, пост
+                                                  роены на акуст...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character р (U+0440)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�ьзуемые в работе, постр
+                                                  оены на акусти...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character о (U+043E)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�зуемые в работе, постро
+                                                  ены на акустич...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character е (U+0435)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�уемые в работе, построе
+                                                  ны на акустиче...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character н (U+043D)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�емые в работе, построен
+                                                  ы на акустичес...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character ы (U+044B)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�мые в работе, построены
+                                                   на акустическ...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character н (U+043D)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...ые в работе, построены н
+                                                  а акустическо�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character а (U+0430)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...е в работе, построены на
+                                                   акустическом ...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character а (U+0430)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...в работе, построены на а
+                                                  кустическом в�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character к (U+043A)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ... работе, построены на ак
+                                                  устическом во�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character у (U+0443)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�аботе, построены на аку
+                                                  стическом вол�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character с (U+0441)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�боте, построены на акус
+                                                  тическом волн�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character т (U+0442)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�оте, построены на акуст
+                                                  ическом волно�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character и (U+0438)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�те, построены на акусти
+                                                  ческом волнов�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character ч (U+0447)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�е, построены на акустич
+                                                  еском волново�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character е (U+0435)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�, построены на акустиче
+                                                  ском волновом ...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character с (U+0441)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ... построены на акустичес
+                                                  ком волновом у...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character к (U+043A)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�остроены на акустическ
+                                                  ом волновом ур...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character о (U+043E)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�строены на акустическо
+                                                  м волновом ура...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character м (U+043C)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�троены на акустическом
+                                                   волновом урав...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character в (U+0432)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...роены на акустическом в
+                                                  олновом уравн�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character о (U+043E)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...оены на акустическом во
+                                                  лновом уравне�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character л (U+043B)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...ены на акустическом вол
+                                                  новом уравнен�...
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character н (U+043D)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...ны на акустическом волн
+                                                  овом уравнении:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character о (U+043E)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...ы на акустическом волно
+                                                  вом уравнении:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character в (U+0432)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ... на акустическом волнов
+                                                  ом уравнении:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character о (U+043E)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�а акустическом волново
+                                                  м уравнении:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character м (U+043C)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...� акустическом волновом
+                                                   уравнении:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character у (U+0443)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�кустическом волновом у
+                                                  равнении:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character р (U+0440)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�устическом волновом ур
+                                                  авнении:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character а (U+0430)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�стическом волновом ура
+                                                  внении:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character в (U+0432)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�тическом волновом урав
+                                                  нении:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character н (U+043D)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�ическом волновом уравн
+                                                  ении:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character е (U+0435)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�ческом волновом уравне
+                                                  нии:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character н (U+043D)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�еском волновом уравнен
+                                                  ии:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character и (U+0438)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�ском волновом уравнени
+                                                  и:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:7: LaTeX Error: Unicode character и (U+0438)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.7 ...�ком волновом уравнении
+                                                  :
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:12: LaTeX Error: Unicode character И (U+0418)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.12 И
+       ли, в операторном виде:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:12: LaTeX Error: Unicode character л (U+043B)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.12 Ил
+         и, в операторном виде:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:12: LaTeX Error: Unicode character и (U+0438)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.12 Или
+           , в операторном виде:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:12: LaTeX Error: Unicode character в (U+0432)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.12 Или, в
+                операторном виде:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:12: LaTeX Error: Unicode character о (U+043E)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.12 Или, в о
+                  ператорном виде:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:12: LaTeX Error: Unicode character п (U+043F)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.12 Или, в оп
+                    ераторном виде:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:12: LaTeX Error: Unicode character е (U+0435)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.12 Или, в опе
+                      раторном виде:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:12: LaTeX Error: Unicode character р (U+0440)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.12 Или, в опер
+                        аторном виде:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:12: LaTeX Error: Unicode character а (U+0430)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.12 Или, в опера
+                          торном виде:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:12: LaTeX Error: Unicode character т (U+0442)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.12 Или, в операт
+                            орном виде:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:12: LaTeX Error: Unicode character о (U+043E)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.12 Или, в операто
+                              рном виде:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:12: LaTeX Error: Unicode character р (U+0440)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.12 Или, в оператор
+                                ном виде:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:12: LaTeX Error: Unicode character н (U+043D)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.12 Или, в операторн
+                                  ом виде:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:12: LaTeX Error: Unicode character о (U+043E)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.12 Или, в операторно
+                                    м виде:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:12: LaTeX Error: Unicode character м (U+043C)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.12 Или, в операторном
+                                       виде:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:12: LaTeX Error: Unicode character в (U+0432)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.12 Или, в операторном в
+                                         иде:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:12: LaTeX Error: Unicode character и (U+0438)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.12 Или, в операторном ви
+                                           де:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:12: LaTeX Error: Unicode character д (U+0434)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.12 Или, в операторном вид
+                                             е:
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:12: LaTeX Error: Unicode character е (U+0435)
+               not set up for use with LaTeX.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.12 Или, в операторном виде
+                                               :
+You may provide a definition with
+\DeclareUnicodeCharacter 
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:15: LaTeX Error: Command \Box not provided in base LaTeX2e.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.15 ...r form using the d'Alembert operator $\Box
+                                                  $:
+Load the latexsym or the amsfonts package to define this symbol
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:24: Missing $ inserted.
+<inserted text> 
+                $
+l.24 Alternative using \laplacian f
+                                   rom physics package
+I've inserted a begin-math/end-math symbol since I think
+you left one out. Proceed, with fingers crossed.
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:25: LaTeX Error: Bad math environment delimiter.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.25 \[
+       
+Your command was ignored.
+Type  I <command> <return>  to replace it with another command,
+or  <return>  to continue without it.
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:27: Missing \endgroup inserted.
+<inserted text> 
+                \endgroup 
+l.27 \]
+       
+I've inserted something that you may have forgotten.
+(See the <inserted text> above.)
+With luck, this will get me unwedged. But if you
+really didn't forget anything, try typing `2' now; then
+my insertion and my current dilemma will both disappear.
+
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:27: LaTeX Error: \begin{document} ended by \end{equation*}.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.27 \]
+       
+Your command was ignored.
+Type  I <command> <return>  to replace it with another command,
+or  <return>  to continue without it.
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:27: Missing $ inserted.
+<inserted text> 
+                $
+l.27 \]
+       
+I've inserted something that you may have forgotten.
+(See the <inserted text> above.)
+With luck, this will get me unwedged. But if you
+really didn't forget anything, try typing `2' now; then
+my insertion and my current dilemma will both disappear.
+
+/home/andrey/devito-vti/examples/equations/acoustic.tex:27: Extra \endgroup.
+<recently read> \endgroup 
+                          
+l.27 \]
+       
+Things are pretty mixed up, but I think the worst is over.
+
+
+
+[1
+
+{/usr/local/texlive/2025/texmf-var/fonts/map/pdftex/updmap/pdftex.map}] (./acoustic.aux)
+ ***********
+LaTeX2e <2025-06-01> patch level 1
+L3 programming layer <2025-08-13>
+ ***********
+ ) 
+Here is how much of TeX's memory you used:
+ 1752 strings out of 467800
+ 24630 string characters out of 5431888
+ 430298 words of memory out of 5000000
+ 30444 multiletter control sequences out of 15000+600000
+ 628206 words of font info for 45 fonts, out of 8000000 for 9000
+ 1141 hyphenation exceptions out of 8191
+ 73i,5n,77p,357b,120s stack positions out of 10000i,1000n,20000p,200000b,200000s
+</usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr5.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/local/texlive/2025/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb>
+Output written on acoustic.pdf (1 page, 79124 bytes).
+PDF statistics:
+ 48 PDF objects out of 1000 (max. 8388607)
+ 28 compressed objects within 1 object stream
+ 0 named destinations out of 1000 (max. 500000)
+ 1 words of extra memory for PDF output out of 10000 (max. 10000000)
+

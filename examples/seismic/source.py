@@ -189,6 +189,24 @@ class PointSource(SparseTimeFunction):
             coordinates=self.coordinates.data,
         )
 
+    def show(self, idx=0, wavelet=None):
+        """
+        Plot the wavelet of the specified source.
+
+        Parameters
+        ----------
+        idx : int
+            Index of the source point for which to plot wavelet.
+        wavelet : ndarray or callable
+            Prescribed wavelet instead of one from this symbol.
+        """
+        wavelet = self.data[:, idx]
+        plt.figure()
+        plt.plot(self.time_values, wavelet)
+        plt.xlabel("Time (ms)")
+        plt.ylabel("Amplitude")
+        plt.tick_params()
+        plt.show()
 
 Receiver = PointSource
 Shot = PointSource
