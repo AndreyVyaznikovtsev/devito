@@ -232,18 +232,18 @@ def main_wavefield_driver(config, iter):
     for i in config.SHOT_IDS:
         compute_forward_snaps(solver, dataset_sub, i, config)
 
-    objective = 0.0
-    # for i in range(len(dataset_sub)):
-    for i in config.SHOT_IDS:
-        objective += compute_adjoint_wavefields(solver, dataset_dplus, dataset_sub, i, config)
-        if i % 5 == 0:
-            print(f"\033[1m{i+1}. Current objective - {objective/len(dataset_sub):.8f}\033[0m")
+    # objective = 0.0
+    # # for i in range(len(dataset_sub)):
+    # for i in config.SHOT_IDS:
+    #     objective += compute_adjoint_wavefields(solver, dataset_dplus, dataset_sub, i, config)
+    #     if i % 5 == 0:
+    #         print(f"\033[1m{i+1}. Current objective - {objective/len(dataset_sub):.8f}\033[0m")
 
-    objective /= len(dataset_sub)
+    # objective /= len(dataset_sub)
     
-    print(f"\033[1mFinal Objective: {objective:.8f}\033[0m")
-    log_file = os.path.join(config.OUTPUT_DIRS['results'], 'log.txt')
-    mode = 'w' if iter == 0 else 'a'  # Create new file for first iteration, append for others
+    # print(f"\033[1mFinal Objective: {objective:.8f}\033[0m")
+    # log_file = os.path.join(config.OUTPUT_DIRS['results'], 'log.txt')
+    # mode = 'w' if iter == 0 else 'a'  # Create new file for first iteration, append for others
     
-    with open(log_file, mode) as f:
-        f.write(f"Iteration {iter}: Final Objective = {objective:.8f}\n")
+    # with open(log_file, mode) as f:
+    #     f.write(f"Iteration {iter}: Final Objective = {objective:.8f}\n")
