@@ -777,7 +777,7 @@ class AbstractFunction(sympy.Function, Basic, Pickable, Evaluable):
         pass
 
     def __str__(self):
-        return "%s(%s)" % (self.name, ', '.join(str(i) for i in self.indices))
+        return f"{self.name}({', '.join(str(i) for i in self.indices)})"
 
     __repr__ = __str__
 
@@ -1107,7 +1107,7 @@ class AbstractFunction(sympy.Function, Basic, Pickable, Evaluable):
         return None.
         """
         if self._mem_mapped:
-            return DeviceMap('d_%s' % self.name, shape=self._shape,
+            return DeviceMap(f'd_{self.name}', shape=self._shape,
                              function=self.function)
         elif self._mem_local:
             return self.indexed
@@ -1175,7 +1175,7 @@ class AbstractFunction(sympy.Function, Basic, Pickable, Evaluable):
 
     @property
     def _C_name(self):
-        return "%s_vec" % self.name
+        return f"{self.name}_vec"
 
     @cached_property
     def _C_symbol(self):
@@ -1574,6 +1574,16 @@ class AbstractTensor(sympy.ImmutableDenseMatrix, Basic, Pickable, Evaluable):
         # Real valued adjoint is transpose
         return self.transpose(inner=inner)
 
+    def __call__(self, **kwargs):
+        """
+        Derivative custom inputs (weights/x0/...) is done through call
+        and needs to be applied to each component through applyfunc
+        """
+        try:
+            return self.applyfunc(lambda x: x(**kwargs))
+        except TypeError as e:
+            raise f"{self.name} not callable with {kwargs}" from e
+
     @call_highest_priority('__radd__')
     def __add__(self, other):
         try:
@@ -1653,7 +1663,13 @@ class IndexedBase(sympy.IndexedBase, Basic, Pickable):
 
     def __getitem__(self, indices, **kwargs):
         """Produce a types.Indexed, rather than a sympy.Indexed."""
-        return Indexed(self, *as_tuple(indices))
+        # Is there a specific Indexed class to use?
+        try:
+            cls = self.function._indexed_cls
+        except AttributeError:
+            cls = Indexed
+
+        return cls(self, *as_tuple(indices))
 
     def _hashable_content(self):
         return super()._hashable_content() + (self.function,)

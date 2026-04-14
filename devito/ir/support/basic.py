@@ -61,9 +61,9 @@ class IterationInstance(LabeledVector):
         x, y, z : findices
         w : a generic Dimension
 
-           | x+1 |           |  x  |          |  x  |          | w |          | x+y |
-    obj1 = | y+2 | ,  obj2 = |  4  | , obj3 = |  x  | , obj4 = | y | , obj5 = |  y  |
-           | z-3 |           | z+1 |          |  y  |          | z |          |  z  |
+         | x+1 |          |  x  |         |  x  |         | w |         | x+y |
+    obj1 | y+2 |,  obj2 = |  4  |, obj3 = |  x  |, obj4 = | y |, obj5 = |  y  |
+         | z-3 |          | z+1 |         |  y  |         | z |         |  z  |
 
     We have that:
 
@@ -232,7 +232,7 @@ class TimedAccess(IterationInstance, AccessMode):
 
     def __repr__(self):
         mode = '\033[1;37;31mW\033[0m' if self.is_write else '\033[1;37;32mR\033[0m'
-        return "%s<%s,[%s]>" % (mode, self.name, ', '.join(str(i) for i in self))
+        return f"{mode}<{self.name},[{', '.join(str(i) for i in self)}]>"
 
     def __eq__(self, other):
         if not isinstance(other, TimedAccess):
@@ -295,7 +295,7 @@ class TimedAccess(IterationInstance, AccessMode):
 
     def __lt__(self, other):
         if not isinstance(other, TimedAccess):
-            raise TypeError("Cannot compare with object of type %s" % type(other))
+            raise TypeError(f"Cannot compare with object of type {type(other)}")
         if self.directions != other.directions:
             raise TypeError("Cannot compare due to mismatching `direction`")
         if self.intervals != other.intervals:
@@ -371,7 +371,8 @@ class TimedAccess(IterationInstance, AccessMode):
                     # symbolic Lt or Gt operations,
                     # Note: Boolean is split to make the conditional short
                     # circuit more frequently for mild speedup.
-                    if smart_lt(v, sit.symbolic_min) or smart_gt(v, sit.symbolic_max):
+                    if smart_lt(v, sit.symbolic_min) or \
+                       smart_gt(v, sit.symbolic_max):
                         return Vector(S.ImaginaryUnit)
 
                 # Case 2: `sit` is an IterationInterval over a local SubDimension
@@ -403,19 +404,24 @@ class TimedAccess(IterationInstance, AccessMode):
                     ret.append(other[n] - self[n])
                 else:
                     ret.append(self[n] - other[n])
-            elif not sai and not oai:
-                # E.g., `self=R<a,[3]>` and `other=W<a,[4]>`
-                if self[n] - other[n] == 0:
-                    ret.append(S.Zero)
-                else:
-                    break
             elif sai in self.ispace and oai in other.ispace:
                 # E.g., `self=R<f,[x, y]>`, `sai=time`,
                 #       `self.itintervals=(time, x, y)`, `n=0`
                 continue
+            elif not sai and not oai:
+                if self[n] - other[n] == 0:
+                    # E.g., `self=R<a,[4]>` and `other=W<a,[4]>`
+                    ret.append(S.Zero)
+                else:
+                    # E.g., `self=R<a,[3]>` and `other=W<a,[4]>`
+                    break
+            elif any(i is S.Infinity for i in (self[n], other[n])):
+                # E.g., `self=R<f,[oo, oo]>` (due to `self.access=f_vec->size[1]`)
+                # and `other=W<f,[t - 1, x + 1]>`
+                ret.append(S.Zero)
             else:
-                # E.g., `self=R<u,[t+1, ii_src_0+1, ii_src_1+2]>`, `fi=p_src`,
-                # and `n=1`
+                # E.g., `self=R<u,[t+1, ii_src_0+1]>`, `fi=p_src`, `n=1`
+                # E.g., `self=R<a,[time,x]>`, `other=W<a,[time,4]>`, `n=1`
                 return vinf(ret)
 
         n = len(ret)
@@ -523,7 +529,7 @@ class Relation:
         self.sink = sink
 
     def __repr__(self):
-        return "%s -- %s" % (self.source, self.sink)
+        return f"{self.source} -- {self.sink}"
 
     def __eq__(self, other):
         # If the timestamps are equal in `self` (ie, an inplace dependence) then
@@ -633,7 +639,7 @@ class Dependence(Relation, CacheInstances):
     """
 
     def __repr__(self):
-        return "%s -> %s" % (self.source, self.sink)
+        return f"{self.source} -> {self.sink}"
 
     @cached_property
     def cause(self):
@@ -1036,26 +1042,27 @@ class Scope(CacheInstances):
         tracked = filter_sorted(set(self.reads) | set(self.writes),
                                 key=lambda i: i.name)
         maxlen = max(1, max([len(i.name) for i in tracked]))
-        out = "{:>%d} =>  W : {}\n{:>%d}     R : {}" % (maxlen, maxlen)
+        out = f"{{:>{maxlen}}} =>  W : {{}}\n{{:>{maxlen}}}     R : {{}}"
         pad = " "*(maxlen + 9)
         reads = [self.getreads(i) for i in tracked]
         for i, r in enumerate(list(reads)):
             if not r:
                 reads[i] = ''
                 continue
-            first = "%s" % tuple.__repr__(r[0])
-            shifted = "\n".join("%s%s" % (pad, tuple.__repr__(j)) for j in r[1:])
-            shifted = "%s%s" % ("\n" if shifted else "", shifted)
+            first = f"{tuple.__repr__(r[0])}"
+            shifted = "\n".join(f"{pad}{tuple.__repr__(j)}" for j in r[1:])
+            newline_prefix = '\n' if shifted else ''
+            shifted = f"{newline_prefix}{shifted}"
             reads[i] = first + shifted
         writes = [self.getwrites(i) for i in tracked]
         for i, w in enumerate(list(writes)):
             if not w:
                 writes[i] = ''
                 continue
-            first = "%s" % tuple.__repr__(w[0])
-            shifted = "\n".join("%s%s" % (pad, tuple.__repr__(j)) for j in w[1:])
-            shifted = "%s%s" % ("\n" if shifted else "", shifted)
-            writes[i] = '\033[1;37;31m%s\033[0m' % (first + shifted)
+            first = f"{tuple.__repr__(w[0])}"
+            shifted = "\n".join(f"{pad}{tuple.__repr__(j)}" for j in w[1:])
+            shifted = f"{chr(10) if shifted else ''}{shifted}"
+            writes[i] = f'\033[1;37;31m{first + shifted}\033[0m'
         return "\n".join([out.format(i.name, w, '', r)
                           for i, r, w in zip(tracked, reads, writes)])
 
@@ -1258,7 +1265,7 @@ class ExprGeometry:
         self.offsets = offsets
 
     def __repr__(self):
-        return "ExprGeometry(expr=%s)" % self.expr
+        return f"ExprGeometry(expr={self.expr})"
 
     def translated(self, other, dims=None):
         """

@@ -180,6 +180,7 @@ class Compiler(GCCToolchain):
     """
 
     fields = {'cc', 'ld'}
+    linker_opt = '-Wl,'
     _default_cpp = False
     _cxxstd = 'c++14'
     _cstd = 'c99'
@@ -290,6 +291,22 @@ class Compiler(GCCToolchain):
         """
         return npct.load_library(str(self.get_jit_dir().joinpath(soname)), '.')
 
+    def save_header(self, filename, code):
+        """
+        Store some source code into a header file within the same temporary directory
+        used for JIT compilation.
+
+        Parameters
+        ----------
+        filename : str
+            The name of the header file (w/o the suffix).
+        code : str
+            The source code to be stored.
+        """
+        hfile = self.get_jit_dir().joinpath(filename).with_suffix('.h')
+        with open(str(hfile), 'w') as f:
+            f.write(code)
+
     def save(self, soname, binary):
         """
         Store a binary into a file within a temporary directory.
@@ -334,6 +351,14 @@ class Compiler(GCCToolchain):
                                                f'Compile log in {logfile}\n'
                                                f'Compile errors in {errfile}\n')
         debug(f"Make <{' '.join(args)}>")
+
+    def _cmdline(self, files, object=False):
+        """
+        Sanitize command line to remove all shell string escape such as
+        mpicc/mpicxx would add, e.g., `-Wl\\,-rpath,/path/to/lib`.
+        """
+        cc_line = super()._cmdline(files, object=object)
+        return [s.replace('\\', '') for s in cc_line]
 
     def jit_compile(self, soname, code):
         """
@@ -417,7 +442,7 @@ class Compiler(GCCToolchain):
         if rpath:
             # Add rpath flag to embed library dir
             for d in as_list(dirs):
-                self.ldflags.append(f'-Wl,-rpath,{d}')
+                self.ldflags.append(f'{self.linker_opt}-rpath,{d}')
 
     def add_libraries(self, libs):
         self.libraries = filter_ordered(self.libraries + as_list(libs))
@@ -654,6 +679,7 @@ class NvidiaCompiler(PGICompiler):
 class CudaCompiler(Compiler):
 
     _default_cpp = True
+    linker_opt = "--linker-options="
 
     def __init_finalize__(self, **kwargs):
 
@@ -681,8 +707,9 @@ class CudaCompiler(Compiler):
                     proc_link_flags.extend(['-Xcompiler', '-pthread'])
                 elif i.startswith('-Wl'):
                     # E.g., `-Wl,-rpath` -> `-Xcompiler "-Wl\,-rpath"`
+                    escaped_i = i.replace(",", r"\\,")
                     proc_link_flags.extend([
-                        '-Xcompiler', '"%s"' % i.replace(',', r'\,')
+                        '-Xcompiler', f'"{escaped_i}"'
                     ])
                 else:
                     proc_link_flags.append(i)

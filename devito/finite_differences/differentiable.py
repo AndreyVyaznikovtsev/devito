@@ -19,7 +19,7 @@ from devito.logger import warning
 from devito.tools import (as_tuple, filter_ordered, flatten, frozendict,
                           infer_dtype, extract_dtype, is_integer, split, is_number)
 from devito.types import Array, DimensionTuple, Evaluable, StencilDimension
-from devito.types.basic import AbstractFunction
+from devito.types.basic import AbstractFunction, Indexed
 
 __all__ = ['Differentiable', 'DiffDerivative', 'IndexDerivative', 'EvalDerivative',
            'Weights', 'Real', 'Imag', 'Conj']
@@ -189,7 +189,7 @@ class Differentiable(sympy.Expr, Evaluable):
         """
         if name in self._fd:
             return self._fd[name][0](self)
-        raise AttributeError("%r object has no attribute %r" % (self.__class__, name))
+        raise AttributeError(f"{self.__class__!r} object has no attribute {name!r}")
 
     # Override SymPy arithmetic operators
     @call_highest_priority('__radd__')
@@ -324,7 +324,7 @@ class Differentiable(sympy.Expr, Evaluable):
         order = order or self.space_order
         space_dims = self.root_dimensions
         shift_x0 = make_shift_x0(shift, (len(space_dims),))
-        derivs = tuple('d%s2' % d.name for d in space_dims)
+        derivs = tuple(f'd{d.name}2' for d in space_dims)
         return Add(*[getattr(self, d)(x0=shift_x0(shift, space_dims[i], None, i),
                                       method=method, fd_order=order, w=w)
                      for i, d in enumerate(derivs)])
@@ -352,8 +352,8 @@ class Differentiable(sympy.Expr, Evaluable):
         space_dims = self.root_dimensions
         shift_x0 = make_shift_x0(shift, (len(space_dims),))
         order = order or self.space_order
-        return Add(*[getattr(self, 'd%s' % d.name)(x0=shift_x0(shift, d, None, i),
-                                                   fd_order=order, method=method, w=w)
+        return Add(*[getattr(self, f'd{d.name}')(x0=shift_x0(shift, d, None, i),
+                                                 fd_order=order, method=method, w=w)
                      for i, d in enumerate(space_dims)])
 
     def grad(self, shift=None, order=None, method='FD', **kwargs):
@@ -380,11 +380,11 @@ class Differentiable(sympy.Expr, Evaluable):
         shift_x0 = make_shift_x0(shift, (len(space_dims),))
         order = order or self.space_order
         w = kwargs.get('weights', kwargs.get('w'))
-        comps = [getattr(self, 'd%s' % d.name)(x0=shift_x0(shift, d, None, i),
-                                               fd_order=order, method=method, w=w)
+        comps = [getattr(self, f'd{d.name}')(x0=shift_x0(shift, d, None, i),
+                                             fd_order=order, method=method, w=w)
                  for i, d in enumerate(space_dims)]
         vec_func = VectorTimeFunction if self.is_TimeDependent else VectorFunction
-        return vec_func(name='grad_%s' % self.name, time_order=self.time_order,
+        return vec_func(name=f'grad_{self.name}', time_order=self.time_order,
                         space_order=self.space_order, components=comps, grid=self.grid)
 
     def biharmonic(self, weight=1):
@@ -393,7 +393,7 @@ class Differentiable(sympy.Expr, Evaluable):
         all spatial Dimensions Laplace(weight * Laplace (self))
         """
         space_dims = self.root_dimensions
-        derivs = tuple('d%s2' % d.name for d in space_dims)
+        derivs = tuple(f'd{d.name}2' for d in space_dims)
         return Add(*[getattr(self.laplace * weight, d) for d in derivs])
 
     def diff(self, *symbols, **assumptions):
@@ -769,11 +769,21 @@ class IndexSum(sympy.Expr, Evaluable):
     func = DifferentiableOp._rebuild
 
 
+class WeightsIndexed(Indexed):
+    pass
+
+
 class Weights(Array):
 
     """
     The weights (or coefficients) of a finite-difference expansion.
     """
+
+    # Use IndexedWeights for the underlying Indexed objects because they
+    # are guaranteed to appear at the end on an expression's .args.
+    # This makes it dramatically easier to implement substutions. It also makes
+    # it easier to visually parse IndexDerivatives when looking at them
+    _indexed_cls = WeightsIndexed
 
     def __init_finalize__(self, *args, **kwargs):
         dimensions = as_tuple(kwargs.get('dimensions'))
