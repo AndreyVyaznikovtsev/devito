@@ -6,12 +6,12 @@ except:
     pass
 
 from devito import (Grid, SubDomain, Function, Constant, warning,
-                    SubDimension, Eq, Inc, Operator, div, sin, Abs)
+                    SubDimension, Eq, Inc, Operator, div, sin, Abs, NODE)
 from devito.builtins import initialize_function, gaussian_smooth, mmax, mmin
 from devito.tools import as_tuple
 
 __all__ = ['SeismicModel', 'Model', 'ModelElastic',
-           'ModelViscoelastic', 'ModelViscoacoustic']
+           'ModelViscoelastic', 'ModelViscoacoustic', 'ModelSH']
 
 
 def initialize_damp(damp, padsizes, spacing, abc_type="damp", fs=False):
@@ -170,12 +170,14 @@ class GenericModel:
         return {i.name: kwargs.get(i.name, i) or i for i in known}
 
     def _gen_phys_param(self, field, name, space_order, is_param=True,
-                        default_value=0, avg_mode='arithmetic', **kwargs):
+                        default_value=0, avg_mode='arithmetic', staggered=None,
+                        **kwargs):
         if field is None:
             return default_value
         if isinstance(field, np.ndarray):
             function = Function(name=name, grid=self.grid, space_order=space_order,
-                                parameter=is_param, avg_mode=avg_mode)
+                                parameter=is_param, avg_mode=avg_mode,
+                                staggered=staggered)
             initialize_function(function, field, self.padsizes)
         else:
             function = Constant(name=name, value=field, dtype=self.grid.dtype)
@@ -477,6 +479,84 @@ def test_model_update(shape):
         # Test 4. Create a new physical parameter in the acoustic model from function
         model.update(i, getattr(va_model, i).data[slices])
         assert np.array_equal(getattr(model, i).data, getattr(va_model, i).data)
+
+
+class ModelSH(GenericModel):
+    """
+    Physical model for SH (Shear Horizontal) wave modelling.
+
+    Parameters
+    ----------
+    origin : tuple of floats
+        Origin of the model in m as a tuple in (x,z) order.
+    spacing : tuple of floats
+        Grid size in m as a tuple in (x,z) order.
+    shape : tuple of int
+        Number of grid points in (x,z) order.
+    space_order : int
+        Order of the spatial stencil discretisation.
+    mu : array_like or float
+        Shear modulus in GPa.
+    b : array_like or float
+        Buoyancy (1/density) in m^3/kg.
+    nbl : int, optional
+        Number of absorbing boundary layers.
+    bcs : str, optional
+        Absorbing boundary type ("damp" or "mask").
+    dtype : data-type, optional
+        Defaults to np.float32.
+    """
+
+    def __init__(self, origin, spacing, shape, space_order, mu, b, nbl=20,
+                 dtype=np.float32, subdomains=(), bcs="mask", grid=None,
+                 topology=None, **kwargs):
+        super().__init__(origin, spacing, shape, space_order, nbl, dtype,
+                         subdomains, topology=topology, grid=grid, bcs=bcs)
+
+        # mu lives at grid nodes (Virieux 1984, Fig. 1).  With parameter=True and
+        # avg_mode='harmonic', Devito produces a 2-point harmonic average to
+        # (x+h/2, z) for the tau_xy update and to (x, z+h/2) for tau_zy —
+        # exactly M_{i+1/2,j} and M_{i,j+1/2} as in Virieux eq. (4).
+        self.mu = self._gen_phys_param(mu, 'mu', space_order, is_param=True,
+                                       avg_mode='harmonic', staggered=NODE)
+        # b (lightness L) is also at grid nodes, co-located with velocity.
+        self.b = self._gen_phys_param(b, 'b', space_order, is_param=True,
+                                      staggered=NODE)
+
+        self._dt = kwargs.get('dt')
+        self._dt_scale = 1
+
+    @property
+    def _max_vs(self):
+        """Maximum shear-wave velocity sqrt(mu * b)."""
+        return np.sqrt(float(mmax(self.mu)) * float(mmax(self.b)))
+
+    @property
+    def _cfl_coeff(self):
+        """
+        CFL stability coefficient for the staggered-time SH scheme.
+        Uses the same half-node FD weights as the elastic solver.
+        """
+        coeffs = fd_w(1, range(-self.space_order//2 + 1, self.space_order//2 + 1), .5)
+        c_fd = sum(np.abs(coeffs[-1][-1])) / 2
+        return .95 * np.sqrt(self.dim) / self.dim / c_fd
+
+    @property
+    def critical_dt(self):
+        """Critical time step from the CFL condition."""
+        dt = self._cfl_coeff * np.min(self.spacing) / self._max_vs
+        dt = self.dtype("%.3e" % (self._dt_scale * dt))
+        if self._dt:
+            return self._dt
+        return dt
+
+    @property
+    def dt_scale(self):
+        return self._dt_scale
+
+    @dt_scale.setter
+    def dt_scale(self, val):
+        self._dt_scale = val
 
 
 # For backward compatibility

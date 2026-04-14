@@ -2,7 +2,7 @@ import os
 
 import numpy as np
 
-from examples.seismic.model import SeismicModel
+from examples.seismic.model import SeismicModel, ModelSH
 
 __all__ = ['demo_model']
 
@@ -373,6 +373,36 @@ def demo_model(preset, **kwargs):
         return SeismicModel(space_order=space_order, vp=vp, qp=qp, b=b, nbl=nbl,
                             dtype=dtype, origin=origin, shape=shape,
                             spacing=spacing, **kwargs)
+
+    elif preset.lower() in ['constant-sh']:
+        # A constant single-layer SH model.
+        # Default shear velocity 1.5 km/s, density 1.0 g/cc.
+        vs = kwargs.pop('vs', 1.5)
+        rho = kwargs.pop('rho', 1.0)
+        b_val = 1.0 / rho
+        mu_val = vs**2 * rho   # mu = rho * vs^2
+
+        return ModelSH(space_order=space_order, mu=mu_val, b=b_val,
+                       origin=origin, shape=shape, dtype=dtype, spacing=spacing,
+                       nbl=nbl, **kwargs)
+
+    elif preset.lower() in ['layers-sh']:
+        # An n-layer SH model with shear velocities from 1.5 to 3.5 km/s.
+        vs_top = kwargs.pop('vs_top', 1.5)
+        vs_bottom = kwargs.pop('vs_bottom', 3.5)
+
+        vs = np.empty(shape, dtype=dtype)
+        vs[:] = vs_top
+        vs_i = np.linspace(vs_top, vs_bottom, nlayers)
+        for i in range(1, nlayers):
+            vs[..., i*int(shape[-1] / nlayers):] = vs_i[i]
+
+        b_arr = Gardners(vs)
+        mu_arr = vs**2 / b_arr   # mu = rho * vs^2
+
+        return ModelSH(space_order=space_order, mu=mu_arr, b=b_arr,
+                       origin=origin, shape=shape, dtype=dtype, spacing=spacing,
+                       nbl=nbl, **kwargs)
 
     else:
         raise ValueError("Unknown model preset name")
