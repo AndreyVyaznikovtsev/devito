@@ -46,18 +46,16 @@ def ForwardOperator(model, geometry, space_order=4, save=False, **kwargs):
         Save the full wavefield history.
     """
     nt = geometry.nt
-    save_t = nt if save else None
 
     x, z = model.grid.dimensions
-
     # Particle velocity at grid nodes
-    v = TimeFunction(name='v', grid=model.grid, save=save_t,
+    v = TimeFunction(name='v', grid=model.grid, save=None,
                      space_order=space_order, time_order=1, staggered=NODE)
 
     # Stress components staggered in x and z respectively
-    tau_xy = TimeFunction(name='tau_xy', grid=model.grid, save=save_t,
+    tau_xy = TimeFunction(name='tau_xy', grid=model.grid, save=None,
                           space_order=space_order, time_order=1, staggered=(x,))
-    tau_zy = TimeFunction(name='tau_zy', grid=model.grid, save=save_t,
+    tau_zy = TimeFunction(name='tau_zy', grid=model.grid, save=None,
                           space_order=space_order, time_order=1, staggered=(z,))
 
     mu, b = model.mu, model.b
