@@ -1,5 +1,6 @@
 from devito import Eq, Operator, TimeFunction, solve
 from devito import NODE
+from devito import ConditionalDimension
 
 
 def src_rec(v, model, geometry):
@@ -73,6 +74,31 @@ def ForwardOperator(model, geometry, space_order=4, save=False, **kwargs):
     u_tau_zy = Eq(tau_zy.forward, model.damp * solve(eq_tau_zy, tau_zy.forward))
 
     srcrec = src_rec(v, model, geometry)
-
-    return Operator([u_v, u_tau_xy, u_tau_zy] + srcrec,
-                    subs=model.spacing_map, name="ForwardSH", **kwargs)
+    stencils = [u_v, u_tau_xy, u_tau_zy] + srcrec
+    if save:
+        nsnaps = kwargs.pop("nsnaps", 1)
+        time_subsample = kwargs.pop("time_subsample", round(nt / nsnaps))
+        time_sub = ConditionalDimension("t_sub", parent=model.grid.time_dim, factor=time_subsample)
+        v_save = TimeFunction(
+            name="v_save",
+            grid=model.grid,
+            time_dim=time_sub,
+            save=nsnaps,
+        )
+        tau_xy_save = TimeFunction(
+            name="tau_xy_save",
+            grid=model.grid,
+            time_dim=time_sub,
+            save=nsnaps,
+        )
+        tau_zy_save = TimeFunction(
+            name="tau_zy_save",
+            grid=model.grid,
+            time_dim=time_sub,
+            save=nsnaps,
+        )
+        stencils += [Eq(v_save, v)]
+        stencils += [Eq(tau_xy_save, tau_xy)]
+        stencils += [Eq(tau_zy_save, tau_zy)]
+    
+    return Operator(stencils, subs=model.spacing_map, name="ForwardSH", **kwargs)
