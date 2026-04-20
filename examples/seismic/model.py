@@ -1,6 +1,7 @@
 from contextlib import suppress
 
 import numpy as np
+import pytest
 from sympy import finite_diff_weights as fd_w
 
 from devito import (Grid, SubDomain, Function, Constant, warning,
@@ -501,26 +502,87 @@ class ModelSH(GenericModel):
         Absorbing boundary type ("damp" or "mask").
     dtype : data-type, optional
         Defaults to np.float32.
+    topo : array_like, optional
+        1-D integer array of length shape[0] giving the first solid z-index at
+        each x column.  Stored as metadata only — ModelSH does not mask the
+        input arrays.  The caller is responsible for pre-zeroing mu and b
+        above the surface to embed the vacuum region before passing them in.
+        The IVF harmonic averaging (_ivf_stagger) is always applied regardless
+        of whether topo is supplied.
     """
 
     def __init__(self, origin, spacing, shape, space_order, mu, b, nbl=20,
                  dtype=np.float32, subdomains=(), bcs="mask", grid=None,
-                 topology=None, **kwargs):
+                 topology=None, topo=None, **kwargs):
         super().__init__(origin, spacing, shape, space_order, nbl, dtype,
                          subdomains, topology=topology, grid=grid, bcs=bcs)
 
-        # mu lives at grid nodes (Virieux 1984, Fig. 1).  With parameter=True and
-        # avg_mode='harmonic', Devito produces a 2-point harmonic average to
-        # (x+h/2, z) for the tau_xy update and to (x, z+h/2) for tau_zy —
-        # exactly M_{i+1/2,j} and M_{i,j+1/2} as in Virieux eq. (4).
-        self.mu = self._gen_phys_param(mu, 'mu', space_order, is_param=True,
-                                       avg_mode='harmonic', staggered=NODE)
-        # b (lightness L) is also at grid nodes, co-located with velocity.
-        self.b = self._gen_phys_param(b, 'b', space_order, is_param=True,
-                                      staggered=NODE)
+        # Work in numpy to compute IVF staggered averages.
+        # Vacuum cells (mu=0, b=0) must be pre-zeroed by the caller in the
+        # input arrays; ModelSH does not modify them internally.
+        mu_arr = self._to_array(mu, self.shape, dtype)
+        b_arr = self._to_array(b, self.shape, dtype)
 
+        # Pre-compute 2-point harmonic averages at staggered positions
+        # (Pan 2018, eqs 13-14).  _safe_harmonic returns 0 when either
+        # neighbour is zero, automatically enforcing traction-free BC at
+        # any vacuum boundary the caller has embedded in the arrays.
+        mu_x_arr, mu_z_arr = self._ivf_stagger(mu_arr)
+
+        x, z = self.grid.dimensions
+
+        # mu_x / mu_z are the fields actually used in the stress stencils.
+        self.mu_x = self._gen_phys_param(mu_x_arr, 'mu_x', space_order,
+                                          is_param=True, staggered=(x,))
+        self.mu_z = self._gen_phys_param(mu_z_arr, 'mu_z', space_order,
+                                          is_param=True, staggered=(z,))
+        # b is co-located with velocity at NODE.
+        self.b = self._gen_phys_param(b_arr, 'b', space_order,
+                                       is_param=True, staggered=NODE)
+        # mu (raw) is kept for CFL computation and FWI gradient use, but is
+        # not passed to the operator — mu_x / mu_z serve that role.
+        self.mu = self._gen_phys_param(mu_arr, 'mu', space_order,
+                                        is_param=True, staggered=NODE)
+        self._physical_parameters.discard('mu')
+
+        self.topo = np.asarray(topo, dtype=int) if topo is not None else None
         self._dt = kwargs.get('dt')
         self._dt_scale = 1
+
+    @staticmethod
+    def _to_array(field, shape, dtype):
+        if isinstance(field, np.ndarray):
+            return field.astype(dtype, copy=True)
+        return np.full(shape, field, dtype=dtype)
+
+    @staticmethod
+    def _safe_harmonic(a, b):
+        """2-point harmonic average; 0 wherever either operand is zero."""
+        result = np.zeros_like(a)
+        mask = (a != 0) & (b != 0)
+        result[mask] = 2.0 / (1.0/a[mask] + 1.0/b[mask])
+        return result
+
+    def _ivf_stagger(self, mu_arr):
+        """
+        Compute pre-averaged effective moduli at staggered positions.
+
+        mu_x[i,k] = harm(mu[i,k], mu[i+1,k])  at (x+h/2, z)  -- eq. 13
+        mu_z[i,k] = harm(mu[i,k], mu[i,k+1])  at (x, z+h/2)  -- eq. 14
+
+        At the last physical column/row (where there is no i+1 or k+1 neighbour),
+        a Neumann (copy) boundary condition is applied: mu_x[-1,:] = mu_arr[-1,:]
+        and mu_z[:,-1] = mu_arr[:,-1].  This ensures that initialize_function's
+        constant-extension padding fills the right/bottom PML with non-zero mu
+        values so that the absorbing boundary works correctly in those directions.
+        """
+        mu_x = np.zeros_like(mu_arr)
+        mu_x[:-1, :] = self._safe_harmonic(mu_arr[:-1, :], mu_arr[1:, :])
+        mu_x[-1, :] = mu_arr[-1, :]   # Neumann at right edge
+        mu_z = np.zeros_like(mu_arr)
+        mu_z[:, :-1] = self._safe_harmonic(mu_arr[:, :-1], mu_arr[:, 1:])
+        mu_z[:, -1] = mu_arr[:, -1]   # Neumann at bottom edge
+        return mu_x, mu_z
 
     @property
     def _max_vs(self):

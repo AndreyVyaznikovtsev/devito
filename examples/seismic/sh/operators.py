@@ -21,24 +21,29 @@ def ForwardOperator(model, geometry, space_order=4, save=False, **kwargs):
     """
     Forward modelling operator for SH (Shear Horizontal) waves.
 
-    Staggered velocity-stress formulation:
+    Staggered velocity-stress formulation (Virieux 1984):
 
-        V^{n+1/2}    = V^{n-1/2}  + dt * b  * (d/dx tau_xy + d/dz tau_zy)
-        tau_xy^{n+1} = tau_xy^{n} + dt * mu * d/dx V^{n+1/2}
-        tau_zy^{n+1} = tau_zy^{n} + dt * mu * d/dz V^{n+1/2}
+        v^{n+1/2}    = v^{n-1/2}  + dt * b    * (d/dx tau_xy  + d/dz tau_zy)
+        tau_xy^{n+1} = tau_xy^{n} + dt * mu_x * d/dx v^{n+1/2}
+        tau_zy^{n+1} = tau_zy^{n} + dt * mu_z * d/dz v^{n+1/2}
 
     Grid staggering:
-        v      -- NODE           (x,     z    )
-        b      -- NODE           (x,     z    )
-        tau_xy -- staggered x    (x+h/2, z    )
-        tau_zy -- staggered z    (x,     z+h/2)
-        mu     -- staggered x,z  (x+h/2, z+h/2)  harmonic-averaged by Devito
-                                                   to tau_xy and tau_zy positions
+        v      -- NODE        (x,     z    )
+        b      -- NODE        (x,     z    )
+        tau_xy -- staggered x (x+h/2, z    )
+        tau_zy -- staggered z (x,     z+h/2)
+        mu_x   -- staggered x (x+h/2, z    )  pre-averaged on ModelSH
+        mu_z   -- staggered z (x,     z+h/2)  pre-averaged on ModelSH
+
+    mu_x and mu_z are 2-point harmonic averages computed by ModelSH.  With IVF
+    (Pan 2018, topo != None), any staggered point that borders a vacuum cell
+    gets mu_x=0 or mu_z=0, which drives the corresponding stress to zero and
+    automatically satisfies the traction-free boundary condition.
 
     Parameters
     ----------
     model : ModelSH
-        Physical model with mu and b.
+        Physical model with mu_x, mu_z, and b.
     geometry : AcquisitionGeometry
         Source and receiver geometry.
     space_order : int, optional
@@ -49,25 +54,20 @@ def ForwardOperator(model, geometry, space_order=4, save=False, **kwargs):
     nt = geometry.nt
 
     x, z = model.grid.dimensions
-    # Particle velocity at grid nodes
     v = TimeFunction(name='v', grid=model.grid, save=None,
                      space_order=space_order, time_order=1, staggered=NODE)
-
-    # Stress components staggered in x and z respectively
     tau_xy = TimeFunction(name='tau_xy', grid=model.grid, save=None,
                           space_order=space_order, time_order=1, staggered=(x,))
     tau_zy = TimeFunction(name='tau_zy', grid=model.grid, save=None,
                           space_order=space_order, time_order=1, staggered=(z,))
 
-    mu, b = model.mu, model.b
+    mu_x, mu_z, b = model.mu_x, model.mu_z, model.b
 
-    # Velocity update: b is at NODE, tau derivatives land at NODE
     eq_v = v.dt - b * (tau_xy.dx + tau_zy.dy)
-
-    # Stress updates: mu is at (x+h/2, z+h/2); Devito harmonic-averages it
-    # to (x+h/2, z) for tau_xy and to (x, z+h/2) for tau_zy
-    eq_tau_xy = tau_xy.dt - mu * v.forward.dx
-    eq_tau_zy = tau_zy.dt - mu * v.forward.dy
+    # mu_x is already at (x+h/2, z) — same position as tau_xy; no re-averaging.
+    eq_tau_xy = tau_xy.dt - mu_x * v.forward.dx
+    # mu_z is already at (x, z+h/2) — same position as tau_zy; no re-averaging.
+    eq_tau_zy = tau_zy.dt - mu_z * v.forward.dy
 
     u_v = Eq(v.forward, model.damp * solve(eq_v, v.forward))
     u_tau_xy = Eq(tau_xy.forward, model.damp * solve(eq_tau_xy, tau_xy.forward))
