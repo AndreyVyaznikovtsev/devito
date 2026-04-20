@@ -84,18 +84,21 @@ def ForwardOperator(model, geometry, space_order=4, save=False, **kwargs):
             grid=model.grid,
             time_dim=time_sub,
             save=nsnaps,
+            staggered=NODE,
         )
         tau_xy_save = TimeFunction(
             name="tau_xy_save",
             grid=model.grid,
             time_dim=time_sub,
             save=nsnaps,
+            staggered=(x,),
         )
         tau_zy_save = TimeFunction(
             name="tau_zy_save",
             grid=model.grid,
             time_dim=time_sub,
             save=nsnaps,
+            staggered=(z,),
         )
         stencils += [Eq(v_save, v)]
         stencils += [Eq(tau_xy_save, tau_xy)]
