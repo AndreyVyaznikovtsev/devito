@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
-from functools import wraps, cached_property
+from functools import cached_property, wraps
 
-import sympy
 import numpy as np
+import sympy
 
 try:
     from scipy.special import i0
@@ -12,10 +12,11 @@ except ImportError:
 from devito.finite_differences.differentiable import Mul
 from devito.finite_differences.elementary import floor
 from devito.logger import warning
-from devito.symbolics import retrieve_function_carriers, retrieve_functions, INT
-from devito.tools import as_tuple, flatten, filter_ordered, Pickable, memoized_meth
-from devito.types import (ConditionalDimension, Eq, Inc, Evaluable, Symbol,
-                          CustomDimension, SubFunction)
+from devito.symbolics import INT, retrieve_function_carriers, retrieve_functions
+from devito.tools import Pickable, as_tuple, filter_ordered, flatten, memoized_meth
+from devito.types import (
+    ConditionalDimension, CustomDimension, Eq, Evaluable, Inc, SubFunction, Symbol
+)
 from devito.types.utils import DimensionTuple
 
 __all__ = ['LinearInterpolator', 'PrecomputedInterpolator', 'SincInterpolator']
@@ -29,6 +30,34 @@ def check_radius(func):
         so = min({f.space_order for f in funcs if not f.is_SparseFunction} or {r})
         if so < r:
             raise ValueError(f"Space order {so} too small for interpolation r {r}")
+        return func(interp, *args, **kwargs)
+    return wrapper
+
+
+def check_coords(func):
+    @wraps(func)
+    def wrapper(interp, *args, **kwargs):
+        inputs = args + as_tuple(kwargs.get('expr', ()))
+
+        # SubFunction of the SparseFunction use to create the interpolator
+        sfunc = interp.sfunction
+
+        # SubFunctions found in the arguments of the interpolation/injection operation
+        a_sfuncs = {f for f in retrieve_functions(inputs)
+                    if f.is_SparseFunction} - {sfunc}
+        if not a_sfuncs:
+            # Only uses the the interpolator's SparseFunction, so no need to check
+            return func(interp, *args, **kwargs)
+
+        # Check that it uses the same coordinates as the interpolator's SparseFunction
+        subfuncs = {getattr(sfunc, s, None) for s in sfunc._sub_functions}
+        for f in a_sfuncs:
+            for s in f._sub_functions:
+                if getattr(f, s, None) not in subfuncs:
+                    raise ValueError(f"Interpolation/injection with {sfunc}"
+                                     f"requires {f} "
+                                     f"to use the same {s} as {sfunc}")
+
         return func(interp, *args, **kwargs)
     return wrapper
 
@@ -232,7 +261,7 @@ class WeightedInterpolator(GenericInterpolator):
         rdims = []
         pos = self.sfunction._position_map.values()
 
-        for (d, rd, p) in zip(gdims, self._cdim, pos):
+        for (d, rd, p) in zip(gdims, self._cdim, pos, strict=True):
             # Add conditional to avoid OOB
             lb = sympy.And(rd + p >= d.symbolic_min - self.r, evaluate=False)
             ub = sympy.And(rd + p <= d.symbolic_max + self.r, evaluate=False)
@@ -300,21 +329,29 @@ class WeightedInterpolator(GenericInterpolator):
         mapper = self._rdim(subdomain=subdomain).getters
 
         # Index substitution to make in variables
-        subs = {ki: c + p for ((k, c), p)
-                in zip(mapper.items(), pos) for ki in {k, k.root}}
+        subs = {
+            ki: c + p
+            for ((k, c), p) in zip(mapper.items(), pos, strict=True)
+            for ki in {k, k.root}
+        }
 
         idx_subs = {v: v.subs(subs) for v in variables}
 
         # Position only replacement, not radius dependent.
         # E.g src.inject(vp(x)*src) needs to use vp[posx] at all points
         # not vp[posx + rx]
-        idx_subs.update({v: v.subs({k: p for (k, p) in zip(mapper, pos)})
-                         for v in pos_only})
+        idx_subs.update({
+            v: v.subs({
+                k: p
+                for (k, p) in zip(mapper, pos, strict=True)
+            }) for v in pos_only
+        })
 
         return idx_subs, temps
 
     @check_radius
-    def interpolate(self, expr, increment=False, self_subs={}, implicit_dims=None):
+    @check_coords
+    def interpolate(self, expr, increment=False, self_subs=None, implicit_dims=None):
         """
         Generate equations interpolating an arbitrary expression into ``self``.
 
@@ -329,9 +366,12 @@ class WeightedInterpolator(GenericInterpolator):
             interpolation expression, but that should be honored when constructing
             the operator.
         """
+        if self_subs is None:
+            self_subs = {}
         return Interpolation(expr, increment, implicit_dims, self_subs, self)
 
     @check_radius
+    @check_coords
     def inject(self, field, expr, implicit_dims=None):
         """
         Generate equations injecting an arbitrary expression into a field.
@@ -349,7 +389,7 @@ class WeightedInterpolator(GenericInterpolator):
         """
         return Injection(field, expr, implicit_dims, self)
 
-    def _interpolate(self, expr, increment=False, self_subs={}, implicit_dims=None):
+    def _interpolate(self, expr, increment=False, self_subs=None, implicit_dims=None):
         """
         Generate equations interpolating an arbitrary expression into ``self``.
 
@@ -370,6 +410,9 @@ class WeightedInterpolator(GenericInterpolator):
         except AttributeError:
             # E.g., a generic SymPy expression or a number
             _expr = expr
+
+        if self_subs is None:
+            self_subs = {}
 
         variables = list(retrieve_function_carriers(_expr))
         subdomain = _extract_subdomain(variables)
@@ -449,7 +492,7 @@ class WeightedInterpolator(GenericInterpolator):
         eqns = [Inc(_field.xreplace(idx_subs),
                     (self._weights(subdomain=subdomain) * _expr).xreplace(idx_subs),
                     implicit_dims=implicit_dims)
-                for (_field, _expr) in zip(fields, _exprs)]
+                for (_field, _expr) in zip(fields, _exprs, strict=True)]
 
         return temps + eqns
 
@@ -470,7 +513,7 @@ class LinearInterpolator(WeightedInterpolator):
     def _weights(self, subdomain=None):
         rdim = self._rdim(subdomain=subdomain)
         c = [(1 - p) * (1 - r) + p * r
-             for (p, d, r) in zip(self._point_symbols, self._gdims, rdim)]
+             for (p, d, r) in zip(self._point_symbols, self._gdims, rdim, strict=True)]
         return Mul(*c)
 
     @cached_property
@@ -486,7 +529,7 @@ class LinearInterpolator(WeightedInterpolator):
         pmap = self.sfunction._position_map
         poseq = [Eq(self._point_symbols[d], pos - floor(pos),
                     implicit_dims=implicit_dims)
-                 for (d, pos) in zip(self._gdims, pmap.keys())]
+                 for (d, pos) in zip(self._gdims, pmap.keys(), strict=True)]
         return poseq
 
 
@@ -566,8 +609,10 @@ of the SincInterpolator that uses i0 (Bessel function).
     @memoized_meth
     def _weights(self, subdomain=None):
         rdims = self._rdim(subdomain=subdomain)
-        return Mul(*[w._subs(rd, rd-rd.parent.symbolic_min)
-                     for (rd, w) in zip(rdims, self.interpolation_coeffs)])
+        return Mul(*[
+            w._subs(rd, rd-rd.parent.symbolic_min)
+            for (rd, w) in zip(rdims, self.interpolation_coeffs, strict=True)
+        ])
 
     def _arg_defaults(self, coords=None, sfunc=None):
         args = {}

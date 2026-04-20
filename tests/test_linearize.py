@@ -1,11 +1,13 @@
-import pytest
 import numpy as np
+import pytest
 import scipy.sparse
 
-from devito import (Grid, Function, TimeFunction, SparseTimeFunction, Operator, Eq,
-                    Inc, MatrixSparseTimeFunction, sin, switchconfig, configuration)
+from devito import (
+    Eq, Function, Grid, Inc, MatrixSparseTimeFunction, Operator, SparseTimeFunction,
+    TimeFunction, configuration, sin, switchconfig
+)
 from devito.ir import Call, Callable, DummyExpr, Expression, FindNodes, SymbolRegistry
-from devito.passes import Graph, linearize, generate_macros
+from devito.passes import Graph, generate_macros, linearize
 from devito.types import Array, Bundle, DefaultDimension
 
 
@@ -268,7 +270,7 @@ def test_unsubstituted_indexeds():
     we end up with two `r0[x, y, z]`, but the former's `x` and `y` are
     SpaceDimensions, while the latter's are BlockDimensions. This means
     that the two objects, while looking identical, are different, and in
-    partical they hash differently, hence we need two entries in a mapper
+    particular they hash differently, hence we need two entries in a mapper
     to perform an Uxreplace. But FindSymbols made us detect only one entry...
     """
     grid = Grid(shape=(8, 8, 8))
@@ -659,3 +661,31 @@ def test_int64_array(order):
     else:
         long = '(long)'
         assert f'({2*order} + {long}y_size)*({2*order} + {long}x_size))' in str(op)
+
+
+def test_cire_n_strides():
+    grid = Grid(shape=(4, 4, 4))
+
+    u = TimeFunction(name='u', grid=grid, space_order=8)
+    u1 = TimeFunction(name='u', grid=grid, space_order=8)
+
+    eqn = Eq(u.forward, u.dy.dx + u.dy.dy + u.dy.dz + 1.)
+
+    op0 = Operator(eqn, opt=('advanced', {'linearize': False, 'cire-mingain': 0}))
+    op1 = Operator(eqn, opt=('advanced', {'linearize': True, 'cire-mingain': 0}))
+    op2 = Operator(eqn, opt=('advanced', {'linearize': True,
+                                          'cire-mingain': 0,
+                                          'cire-minmem': False}))
+
+    # Check generated code
+    assert 'uL0' in str(op1)
+    assert len(op1.body.strides) == 11
+    assert 'uL0' in str(op2)
+    assert len(op2.body.strides) == 9  # Fewer size/stride vars thx to cire-minmem
+
+    op0.apply(time_M=10)
+    op2.apply(time_M=10, u=u1)
+
+    # NOTE: not exact equality because `op2` slightly changes the order of
+    # arithmetic operations, which in turn causes some rounding differences
+    assert np.allclose(u.data, u1.data, rtol=1e-4)

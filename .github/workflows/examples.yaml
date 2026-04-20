@@ -1,12 +1,14 @@
 name: Examples
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 on:
-  # Trigger the workflow on push or pull request,
-  # but only for the main branch
+  # Trigger the workflow on push or pull request, but only for the main branch
   push:
     branches:
       - main
@@ -29,15 +31,15 @@ jobs:
       DEVITO_LANGUAGE: "openmp"
 
     strategy:
-      # Prevent all build to stop if a single one fails
+      # Prevent cancellation if a single workflow fails
       fail-fast: false
 
     steps:
     - name: Checkout devito
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
 
     - name: Checkout data
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
        repository: 'devitocodes/data'
        path: 'data'
@@ -46,7 +48,7 @@ jobs:
       uses: conda-incubator/setup-miniconda@v3
       with:
        activate-environment: devito
-       environment-file: environment-dev.yml
+       environment-file: environment-dev.yaml
        auto-activate-base: false
 
     - name: Tests in examples
@@ -95,7 +97,7 @@ jobs:
         python examples/timestepping/acoustic_superstep.py --model marmousi
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v5
+      uses: codecov/codecov-action@v6
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
-        name: ${{ matrix.name }}
+        name: Examples

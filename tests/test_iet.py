@@ -1,24 +1,28 @@
-import pytest
-
 from ctypes import c_void_p
+
 import cgen
 import numpy as np
+import pytest
 import sympy
 
-from devito import (Eq, Grid, Function, TimeFunction, Operator, Dimension,  # noqa
-                    switchconfig)
-from devito.ir.iet import (
-    Call, Callable, Conditional, Definition, DeviceCall, DummyExpr, Iteration, List,
-    KernelLaunch, Lambda, ElementalFunction, CGen, FindSymbols, filter_iterations,
-    make_efunc, retrieve_iteration_tree, Transformer
+from devito import (  # noqa
+    Dimension, Eq, Function, Grid, Operator, TimeFunction, switchconfig
 )
 from devito.ir import SymbolRegistry
+from devito.ir.iet import (
+    Call, Callable, CGen, Conditional, Definition, Dereference, DeviceCall, DummyExpr,
+    ElementalFunction, FindSymbols, Iteration, KernelLaunch, Lambda, List, Switch,
+    Transformer, filter_iterations, make_efunc, retrieve_iteration_tree
+)
 from devito.passes.iet.engine import Graph
 from devito.passes.iet.languages.C import CDataManager
-from devito.symbolics import (Byref, FieldFromComposite, InlineIf, Macro, Class,
-                              String, FLOAT)
+from devito.symbolics import (
+    FLOAT, Byref, Class, FieldFromComposite, InlineIf, ListInitializer, Macro, SizeOf,
+    String
+)
 from devito.tools import CustomDtype, as_tuple, dtype_to_ctype
-from devito.types import CustomDimension, Array, LocalObject, Symbol
+from devito.types import Array, CustomDimension, LocalObject, Pointer, Symbol
+from devito.types.misc import FunctionMap
 
 
 @pytest.fixture
@@ -75,11 +79,11 @@ def test_make_efuncs(exprs, nfuncs, ntimeiters, nests):
     efuncs = []
     for n, tree in enumerate(retrieve_iteration_tree(op)):
         root = filter_iterations(tree, key=lambda i: i.dim.is_Space)[0]
-        efuncs.append(make_efunc('f%d' % n, root))
+        efuncs.append(make_efunc(f'f{n}', root))
 
     assert len(efuncs) == len(nfuncs) == len(ntimeiters) == len(nests)
 
-    for efunc, nf, nt, nest in zip(efuncs, nfuncs, ntimeiters, nests):
+    for efunc, nf, nt, nest in zip(efuncs, nfuncs, ntimeiters, nests, strict=True):
         # Check the `efunc` parameters
         assert all(i in efunc.parameters for i in (x.symbolic_min, x.symbolic_max))
         assert all(i in efunc.parameters for i in (y.symbolic_min, y.symbolic_max))
@@ -96,7 +100,7 @@ def test_make_efuncs(exprs, nfuncs, ntimeiters, nests):
         trees = retrieve_iteration_tree(efunc)
         assert len(trees) == 1
         tree = trees[0]
-        assert all(i.dim.name == j for i, j in zip(tree, nest))
+        assert all(i.dim.name == j for i, j in zip(tree, nest, strict=True))
 
         assert efunc.make_call()
 
@@ -297,6 +301,52 @@ static void foo()
 }"""
 
 
+def test_make_cuda_tensor_map():
+
+    class CUTensorMap(FunctionMap):
+
+        dtype = CustomDtype('CUtensorMap')
+
+        @property
+        def _C_init(self):
+            symsizes = list(reversed(self.tensor.symbolic_shape))
+            sizeof_dtype = SizeOf(self.tensor.dmap._C_typedata)
+
+            sizes = ListInitializer(symsizes)
+            strides = ListInitializer([
+                np.prod(symsizes[:i])*sizeof_dtype for i in range(1, len(symsizes))
+            ])
+
+            arguments = [
+                Byref(self),
+                Macro('CU_TENSOR_MAP_DATA_TYPE_FLOAT32'),
+                4, self.tensor.dmap, sizes, strides,
+            ]
+            call = Call('cuTensorMapEncodeTiled', arguments)
+
+            return call
+
+    grid = Grid(shape=(10, 10, 10))
+
+    u = TimeFunction(name='u', grid=grid)
+
+    tmap = CUTensorMap('tmap', u)
+
+    iet = Call('foo', tmap)
+    iet = ElementalFunction('foo', iet, parameters=())
+    dm = CDataManager(sregistry=None)
+    iet = CDataManager.place_definitions.__wrapped__(dm, iet)[0]
+
+    assert str(iet) == """\
+static void foo()
+{
+  CUtensorMap tmap;
+  cuTensorMapEncodeTiled(&tmap,CU_TENSOR_MAP_DATA_TYPE_FLOAT32,4,d_u,{u_vec->size[3], u_vec->size[2], u_vec->size[1], u_vec->size[0]},{sizeof(float)*u_vec->size[3], sizeof(float)*u_vec->size[2]*u_vec->size[3], sizeof(float)*u_vec->size[1]*u_vec->size[2]*u_vec->size[3]});
+
+  foo(tmap);
+}"""  # noqa
+
+
 def test_cpp_local_object():
     """
     Test C++ support for LocalObjects.
@@ -309,7 +359,7 @@ def test_cpp_local_object():
     lo0 = MyObject('obj0')
 
     # Globally-scoped objects must not be declared in the function body
-    lo1 = MyObject('obj1', is_global=True)
+    lo1 = MyObject('obj1', scope='global')
 
     # A LocalObject using both a template and a modifier
     class SpecialObject(LocalObject):
@@ -496,3 +546,44 @@ def test_list_inline():
 
     lst = List(body=[expr0, expr1], inline=True)
     assert str(lst) == """a = 1; b = 2;"""
+
+
+def test_dereference_base_plus_off():
+    ptr = Pointer(name='p', dtype=np.float32)
+    off = Symbol(name='offs', dtype=np.int32)
+
+    dim0 = CustomDimension(name='d0', symbolic_size=2)
+    dim1 = CustomDimension(name='d1', symbolic_size=3)
+    x = Array(name='x', dimensions=(dim0, dim1), dtype=np.float32)
+
+    deref = Dereference(x, ptr, offset=off)
+
+    assert str(deref) == "float (*restrict x)[3] = (float (*)[3]) (p + offs);"
+
+
+def test_switch_case():
+    flag = Symbol(name='flag')
+    a = Symbol(name='a')
+
+    cases = [0, 1]
+    nodes = [DummyExpr(a, 1), DummyExpr(a, 2)]
+    default = DummyExpr(a, 0)
+
+    switch = Switch(flag, cases, nodes, default=default)
+
+    assert str(switch) == """\
+switch (flag)
+{
+  case 0: {
+    a = 1;
+    break;
+  }
+  case 1: {
+    a = 2;
+    break;
+  }
+  default: {
+    a = 0;
+    break;
+  }
+}"""

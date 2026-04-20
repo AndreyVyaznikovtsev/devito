@@ -1,10 +1,11 @@
-import pytest
 import numpy as np
+import pytest
 from sympy import simplify
 
-from devito import (Function, Grid, NODE, CELL, VectorTimeFunction,
-                    TimeFunction, Eq, Operator, div, Dimension)
-from devito.tools import powerset, as_tuple
+from devito import (
+    CELL, NODE, Eq, Function, Grid, Operator, TimeFunction, VectorTimeFunction, div
+)
+from devito.tools import as_tuple, powerset
 
 
 @pytest.mark.parametrize('ndim', [1, 2, 3])
@@ -48,7 +49,9 @@ def test_avg(ndim):
         shifted = f
         for dd in d:
             shifted = shifted.subs({dd: dd - dd.spacing/2})
-        assert all(i == dd for i, dd in zip(shifted.indices, grid.dimensions))
+        assert all(
+            i == dd for i, dd in zip(shifted.indices, grid.dimensions, strict=True)
+        )
         # Average automatically i.e.:
         # f not defined at x so f(x, y) = 0.5*f(x - h_x/2, y) + 0.5*f(x + h_x/2, y)
         avg = f
@@ -60,7 +63,7 @@ def test_avg(ndim):
 @pytest.mark.parametrize('ndim', [1, 2, 3])
 def test_is_param(ndim):
     """
-    Test that only parameter are evaluated at the variable anf Function and FD indices
+    Test that only parameter are evaluated at the variable and Function and FD indices
     stay unchanged
     """
     grid = Grid(tuple([10]*ndim))
@@ -68,15 +71,11 @@ def test_is_param(ndim):
     var = Function(name="f", grid=grid, staggered=NODE)
     for d in dims:
         f = Function(name="f", grid=grid, staggered=d)
-        f2 = Function(name="f2", grid=grid, staggered=d, parameter=True)
-
-        # Not a parameter stay untouched (or FD would be destroyed by _eval_at)
-        assert f._eval_at(var).evaluate == f
         # Parameter, automatic averaging
-        avg = f2
+        avg = f
         for dd in d:
             avg = .5 * (avg + avg.subs({dd: dd - dd.spacing}))
-        assert simplify(f2._eval_at(var).evaluate - avg) == 0
+        assert simplify(f._eval_at(var).evaluate - avg) == 0
 
 
 @pytest.mark.parametrize('expr, expected', [
@@ -91,7 +90,7 @@ def test_gather_for_diff(expr, expected):
     y0 = y + y.spacing/2  # noqa
     a = Function(name="a", grid=grid, staggered=NODE)  # noqa
     b = Function(name="b", grid=grid, staggered=x)  # noqa
-    c = Function(name="c", grid=grid, staggered=y, parameter=True)  # noqa
+    c = Function(name="c", grid=grid, staggered=y)  # noqa
     d = Function(name="d", grid=grid)  # noqa
 
     assert eval(expr) == eval(expected)
@@ -99,7 +98,7 @@ def test_gather_for_diff(expr, expected):
 
 @pytest.mark.parametrize('expr, expected', [
     ('((a + b).dx._eval_at(a)).is_Add', 'True'),
-    ('(a + b).dx._eval_at(a)', 'a.dx(x0=a.indices_ref.getters) + b.dx._eval_at(a)'),
+    ('(a + b).dx._eval_at(a)', 'a.dx + b.dx._eval_at(a)'),
     ('(a*b).dx._eval_at(a).expr', 'a.subs({x: x0}) * b'),
     ('(a * b.dx).dx._eval_at(b).expr._eval_deriv ',
      'a.subs({x: x0}) * b.dx.evaluate')])
@@ -143,7 +142,7 @@ def test_staggered_div():
     v[0].data[:] = 5.
     v[1].data[:] = 5.
 
-    A = Function(name="A", grid=grid, space_order=4, staggred=NODE, parameter=True)
+    A = Function(name="A", grid=grid, space_order=4, staggred=NODE)
     A._data_with_outhalo[:] = .5
 
     av = VectorTimeFunction(name="av", grid=grid, time_order=1, space_order=4)
@@ -173,17 +172,44 @@ def test_staggered_rebuild(stagg):
     f = Function(name='f', grid=grid, space_order=4, staggered=stagg)
     assert tuple(f.staggered.getters.keys()) == grid.dimensions
 
-    new_dims = (Dimension('x1'), Dimension('y1'), Dimension('z1'))
-    f2 = f.func(dimensions=new_dims)
+    f2 = f.func(name="f2")
 
-    assert f2.dimensions == new_dims
+    assert f2.dimensions == f.dimensions
     assert tuple(f2.staggered) == tuple(f.staggered)
-    assert tuple(f2.staggered.getters.keys()) == new_dims
+    assert tuple(f2.staggered.getters.keys()) == f.dimensions
 
     # Check that rebuild correctly set the staggered indices
     # with the new dimensions
-    for (d, nd) in zip(grid.dimensions, new_dims):
+    for (d, nd) in zip(grid.dimensions, f.dimensions, strict=True):
         if d in as_tuple(stagg) or stagg is CELL:
             assert f2.indices[nd] == nd + nd.spacing / 2
         else:
             assert f2.indices[nd] == nd
+
+
+def test_eval_at_different_dim():
+    grid = Grid(shape=(31, 17, 25))
+    nt = 5
+    x, _, _ = grid.dimensions
+
+    v = TimeFunction(name="v", grid=grid, staggered=x)
+    tau = TimeFunction(name="tau", grid=grid, save=nt)
+
+    eq = Eq(tau.forward, v).evaluate
+
+    assert grid.time_dim not in eq.rhs.free_symbols
+
+
+def test_new_from_staggering():
+    grid = Grid(shape=(31, 17, 25))
+    x, _, _ = grid.dimensions
+
+    f = TimeFunction(name="f", grid=grid, staggered=x)
+    # This used to fail since f.staggered as 4 elements (0, 1, 0, 0)
+    # but it is processed for Dimension only.
+    # Now properly  converts Staggering to the ref (x,) at init
+    g = TimeFunction(name="g", grid=grid, staggered=f.staggered)
+
+    assert g.staggered._ref == (x,)
+    assert g.staggered == (0, 1, 0, 0)
+    assert g.staggered == f.staggered

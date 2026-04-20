@@ -1,24 +1,24 @@
 """
 Utilities to turn SymPy objects into C strings.
 """
+from contextlib import suppress
+
 import numpy as np
 import sympy
-
 from mpmath.libmp import prec_to_dps, to_str
 from packaging.version import Version
-
 from sympy.core import S
-from sympy.core.numbers import equal_valued, Float
-from sympy.printing.codeprinter import CodePrinter
+from sympy.core.numbers import Float, equal_valued
 from sympy.logic.boolalg import BooleanFunction
+from sympy.printing.codeprinter import CodePrinter
 from sympy.printing.precedence import PRECEDENCE_VALUES, precedence
 
 from devito import configuration
 from devito.arch.compiler import AOMPCompiler
 from devito.symbolics.inspection import has_integer_args, sympy_dtype
 from devito.symbolics.queries import q_leaf
+from devito.tools import ctypes_to_cstr, ctypes_vector_mapper, dtype_to_ctype
 from devito.types.basic import AbstractFunction
-from devito.tools import ctypes_to_cstr, dtype_to_ctype, ctypes_vector_mapper
 
 __all__ = ['BasePrinter', 'ccode']
 
@@ -92,6 +92,9 @@ class BasePrinter(CodePrinter):
     def func_literal(self, expr):
         return self._func_literals.get(self._prec(expr), '')
 
+    def ns(self, expr):
+        return self._ns
+
     def func_prefix(self, expr, mfunc=False):
         prefix = self._func_prefix.get(self._prec(expr), '')
         if mfunc:
@@ -114,10 +117,8 @@ class BasePrinter(CodePrinter):
             return f'{ctype} *'
 
     def _print_type(self, expr):
-        try:
+        with suppress(TypeError):
             expr = dtype_to_ctype(expr)
-        except TypeError:
-            pass
         try:
             return self.type_mappings[expr]
         except KeyError:
@@ -193,7 +194,7 @@ class BasePrinter(CodePrinter):
         else:
             args = ', '.join([self._print(arg) for arg in expr.args])
 
-        return f'{self._ns}{cname}({args})'
+        return f'{self.ns(expr)}{cname}({args})'
 
     def _print_Pow(self, expr):
         # Completely reimplement `_print_Pow` from sympy, since it doesn't
@@ -207,17 +208,22 @@ class BasePrinter(CodePrinter):
             return self._print_Float(Float(1.0)) + '/' + \
                 self.parenthesize(expr.base, PREC)
         elif equal_valued(expr.exp, 0.5):
-            return f'{self._ns}sqrt{suffix}({base})'
+            return f'{self.ns(expr)}sqrt{suffix}({base})'
         elif expr.exp == S.One/3 and self.standard != 'C89':
-            return f'{self._ns}cbrt{suffix}({base})'
+            return f'{self.ns(expr)}cbrt{suffix}({base})'
         else:
-            return f'{self._ns}pow{suffix}({base}, {self._print(expr.exp)})'
+            return f'{self.ns(expr)}pow{suffix}({base}, {self._print(expr.exp)})'
 
     def _print_SafeInv(self, expr):
         """Print a SafeInv as a C-like division with a check for zero."""
         base = self._print(expr.base)
         val = self._print(expr.val)
         return f'SAFEINV({val}, {base})'
+
+    def _print_RoundUp(self, expr):
+        value = self._print(expr.value)
+        step = self._print(expr.step)
+        return f'ROUND_UP({value}, {step})'
 
     def _print_Mod(self, expr):
         """Print a Mod as a C-like %-based operation."""
@@ -241,7 +247,7 @@ class BasePrinter(CodePrinter):
     def _print_fmath_func(self, name, expr):
         args = ",".join([self._print(i) for i in expr.args])
         func = f'{self.func_prefix(expr, mfunc=True)}{name}{self.func_literal(expr)}'
-        return f"{self._ns}{func}({args})"
+        return f"{self.ns(expr)}{func}({args})"
 
     def _print_Min(self, expr):
         if len(expr.args) > 2:
@@ -273,6 +279,22 @@ class BasePrinter(CodePrinter):
             return f"fabs({self._print(arg)})"
         return self._print_fmath_func('abs', expr)
 
+    def _print_BitwiseNot(self, expr):
+        # Unary function, single argument
+        arg = expr.args[0]
+        return f'~{self._print(arg)}'
+
+    def _print_BitwiseBinaryOp(self, expr):
+        arg0, arg1 = expr.args
+
+        prec = precedence(expr)
+        if not arg0.is_Atom:
+            arg0 = self.parenthesize(arg0, prec)
+        if not arg1.is_Atom:
+            arg1 = self.parenthesize(arg1, prec)
+
+        return f'{self._print(arg0)} {expr.op} {self._print(arg1)}'
+
     def _print_Add(self, expr, order=None):
         """"
         Print an addition.
@@ -298,10 +320,7 @@ class BasePrinter(CodePrinter):
         """Print a Float in C-like scientific notation."""
         prec = expr._prec
 
-        if prec < 5:
-            dps = 0
-        else:
-            dps = prec_to_dps(expr._prec)
+        dps = 0 if prec < 5 else prec_to_dps(expr._prec)
 
         if self._settings["full_prec"] is True:
             strip = False
@@ -346,7 +365,8 @@ class BasePrinter(CodePrinter):
         return f"{{{', '.join(self._print(i) for i in expr.params)}}}"
 
     def _print_IndexedPointer(self, expr):
-        return f"{expr.base}{''.join(f'[{self._print(i)}]' for i in expr.index)}"
+        base = self._print(expr.base)
+        return f"{base}{''.join(f'[{self._print(i)}]' for i in expr.index)}"
 
     def _print_IntDiv(self, expr):
         lhs = self._print(expr.lhs)
@@ -391,7 +411,7 @@ class BasePrinter(CodePrinter):
         return f'sizeof({self._print(expr.intype)}{self._print(expr.stars)})'
 
     def _print_MathFunction(self, expr):
-        return f"{self._ns}{self._print_DefFunction(expr)}"
+        return f"{self.ns(expr)}{self._print_DefFunction(expr)}"
 
     def _print_Fallback(self, expr):
         return expr.__str__()
@@ -407,7 +427,7 @@ class BasePrinter(CodePrinter):
 
 
 # Lifted from SymPy so that we go through our own `_print_math_func`
-for k in ('exp log sin cos tan ceiling floor').split():
+for k in ['exp', 'log', 'sin', 'cos', 'tan', 'ceiling', 'floor']:
     setattr(BasePrinter, f'_print_{k}', BasePrinter._print_math_func)
 
 
@@ -419,7 +439,7 @@ PRECEDENCE_VALUES['InlineIf'] = 1
 # Sympy 1.11 has introduced a bug in `_print_Add`, so we enforce here
 # to always use the correct one from our printer
 if Version(sympy.__version__) >= Version("1.11"):
-    setattr(sympy.printing.str.StrPrinter, '_print_Add', BasePrinter._print_Add)
+    sympy.printing.str.StrPrinter._print_Add = BasePrinter._print_Add
 
 
 def ccode(expr, printer=None, **settings):

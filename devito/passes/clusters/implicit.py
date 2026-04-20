@@ -5,7 +5,7 @@ Passes to gather and form implicit equations from DSL abstractions.
 from collections import defaultdict
 from functools import singledispatch
 
-from devito.ir import SEQUENTIAL, Queue, Forward
+from devito.ir import SEQUENTIAL, Forward, Queue
 from devito.symbolics import retrieve_dimensions
 from devito.tools import Bunch, frozendict, timed_pass
 from devito.types import Eq
@@ -175,13 +175,17 @@ class LowerImplicitMSD(LowerMSD):
 
             # Make sure the "implicit expressions" are scheduled in
             # the innermost loop such that the thicknesses can be computed
-            edims = set(retrieve_dimensions(mapper.values(), deep=True))
-            if dim not in edims or not edims.issubset(prefix.dimensions):
+            def key(tkn):
+                edims = set(retrieve_dimensions(tkn, deep=True))
+                return dim._defines & edims and edims.issubset(prefix.dimensions)
+
+            mapper = {k: v for k, v in mapper.items() if key(v)}
+            if not mapper:
                 continue
 
             found[d.functions].clusters.append(c)
             found[d.functions].mapper = reduce(found[d.functions].mapper,
-                                               mapper, edims, prefix)
+                                               mapper, {dim}, prefix)
 
         # Turn the reduced mapper into a list of equations
         processed = []
@@ -221,8 +225,10 @@ def _lower_msd(dim, cluster):
 @_lower_msd.register(MultiSubDimension)
 def _(dim, cluster):
     i_dim = dim.implicit_dimension
-    mapper = {tkn: dim.functions[i_dim, mM]
-              for tkn, mM in zip(dim.tkns, dim.bounds_indices)}
+    mapper = {
+        tkn: dim.functions[i_dim, mM]
+        for tkn, mM in zip(dim.tkns, dim.bounds_indices, strict=True)
+    }
     return mapper, i_dim
 
 
@@ -254,12 +260,13 @@ def reduce(m0, m1, edims, prefix):
         raise NotImplementedError
     d, = edims
 
-    if prefix[d].direction is Forward:
-        func = max
-    else:
-        func = min
+    func = max if prefix[d].direction is Forward else min
 
-    key = lambda i: i.indices[d]
+    def key(i):
+        try:
+            return i.indices[d]
+        except (KeyError, AttributeError):
+            return i
 
     mapper = {}
     for k, e in m1.items():

@@ -1,44 +1,48 @@
-from collections import OrderedDict, namedtuple
-from functools import cached_property
 import ctypes
 import shutil
-from operator import attrgetter
+from collections import OrderedDict, namedtuple
+from contextlib import suppress
+from functools import cached_property
 from math import ceil
+from operator import attrgetter
 from tempfile import gettempdir
 
-from sympy import sympify
-import sympy
 import numpy as np
+import sympy
+from sympy import sympify
 
-from devito.arch import ANYCPU, Device, compiler_registry, platform_registry
+from devito.arch import (
+    ANYCPU, Device, compiler_registry, get_visible_devices, platform_registry
+)
 from devito.data import default_allocator
-from devito.exceptions import (CompilationError, ExecutionError, InvalidArgument,
-                               InvalidOperator)
-from devito.logger import (debug, info, perf, warning, is_log_enabled_for,
-                           switch_log_level)
-from devito.ir.equations import LoweredEq, lower_exprs, concretize_subdims
+from devito.exceptions import (
+    CompilationError, ExecutionError, InvalidArgument, InvalidOperator
+)
 from devito.ir.clusters import ClusterGroup, clusterize
-from devito.ir.iet import (Callable, CInterface, EntryFunction, DeviceFunction,
-                           FindSymbols, MetaCall, derive_parameters, iet_build)
-from devito.ir.support import AccessMode, SymbolRegistry
+from devito.ir.equations import LoweredEq, concretize_subdims, lower_exprs
+from devito.ir.iet import (
+    Callable, CInterface, DeviceFunction, EntryFunction, FindSymbols, MetaCall,
+    derive_parameters, iet_build
+)
 from devito.ir.stree import stree_build
+from devito.ir.support import AccessMode, SymbolRegistry
+from devito.logger import debug, info, is_log_enabled_for, perf, switch_log_level, warning
+from devito.mpi import MPI
 from devito.operator.profiling import create_profile
 from devito.operator.registry import operator_selector
-from devito.mpi import MPI
 from devito.parameters import configuration
 from devito.passes import (
-    Graph, lower_index_derivatives, generate_implicit, generate_macros,
-    minimize_symbols, unevaluate, error_mapper, is_on_device, lower_dtypes
+    Graph, error_mapper, generate_implicit, generate_macros, is_on_device, lower_dtypes,
+    lower_index_derivatives, minimize_symbols, optimize_pows, unevaluate
 )
 from devito.symbolics import estimate_cost, subs_op_args
-from devito.tools import (DAG, OrderedSet, Signer, ReducerMap, as_mapper, as_tuple,
-                          flatten, filter_sorted, frozendict, is_integer,
-                          split, timed_pass, timed_region, contains_val,
-                          CacheInstances, MemoryEstimate)
-from devito.types import (Buffer, Evaluable, host_layer, device_layer,
-                          disk_layer)
+from devito.tools import (
+    DAG, CacheInstances, MemoryEstimate, OrderedSet, ReducerMap, Signer, as_mapper,
+    as_tuple, contains_val, filter_sorted, flatten, frozendict, is_integer, split,
+    timed_pass, timed_region
+)
+from devito.types import Buffer, Evaluable, device_layer, disk_layer, host_layer
 from devito.types.dimension import Thickness
-
 
 __all__ = ['Operator']
 
@@ -397,16 +401,18 @@ class Operator(Callable):
 
         # Operation count after specialization
         final_ops = sum(estimate_cost(c.exprs) for c in clusters if c.is_dense)
-        try:
+        with suppress(AttributeError):
             profiler.record_ops_variation(init_ops, final_ops)
-        except AttributeError:
-            pass
 
         # Generate implicit Clusters from higher level abstractions
         clusters = generate_implicit(clusters)
 
         # Lower all remaining high order symbolic objects
         clusters = lower_index_derivatives(clusters, **kwargs)
+
+        # Turn pows into multiplications. This must happen as late as possible
+        # in the compilation process to maximize the optimization potential
+        clusters = optimize_pows(clusters)
 
         # Make sure no reconstructions can unpick any of the symbolic
         # optimizations performed so far
@@ -461,16 +467,14 @@ class Operator(Callable):
         uiet = iet_build(stree)
 
         # Analyze the IET Sections for C-level profiling
-        try:
+        with suppress(AttributeError):
             profiler.analyze(uiet)
-        except AttributeError:
-            pass
 
         return uiet
 
     @classmethod
     @timed_pass(name='lowering.IET')
-    def _lower_iet(cls, uiet, profiler=None, **kwargs):
+    def _lower_iet(cls, uiet, **kwargs):
         """
         Iteration/Expression tree lowering:
 
@@ -492,7 +496,7 @@ class Operator(Callable):
         # Instrument the IET for C-level profiling
         # Note: this is postponed until after _specialize_iet because during
         # specialization further Sections may be introduced
-        cls._Target.instrument(graph, profiler=profiler, **kwargs)
+        cls._Target.instrument(graph, **kwargs)
 
         # Extract the necessary macros from the symbolic objects
         generate_macros(graph, **kwargs)
@@ -599,11 +603,6 @@ class Operator(Callable):
                  if i.is_Derived and i.parent in nodes]
         toposort = DAG(nodes, edges).topological_sort()
 
-        futures = {}
-        for d in reversed(toposort):
-            if set(d._arg_names).intersection(kwargs):
-                futures.update(d._arg_values(self._dspace[d], args={}, **kwargs))
-
         # Prepare to process data-carriers
         args = kwargs['args'] = ReducerMap()
 
@@ -619,11 +618,11 @@ class Operator(Callable):
             args.update(p._arg_values(estimate_memory=estimate_memory, **kwargs))
             try:
                 args.reduce_inplace()
-            except ValueError:
+            except ValueError as e:
                 v = [i for i in overrides if i.name in args]
                 raise InvalidArgument(
                     f"Override `{p}` is incompatible with overrides `{v}`"
-                )
+                ) from e
 
         # Process data-carrier defaults
         for p in defaults:
@@ -633,9 +632,6 @@ class Operator(Callable):
             for k, v in p._arg_values(estimate_memory=estimate_memory, **kwargs).items():
                 if k not in args:
                     args[k] = v
-                elif k in futures:
-                    # An explicit override is later going to set `args[k]`
-                    pass
                 elif k in kwargs:
                     # User is in control
                     # E.g., given a ConditionalDimension `t_sub` with factor `fact`
@@ -648,8 +644,11 @@ class Operator(Callable):
                         f"`{k}={v}`, while `{k}={args[k]}` is expected. Perhaps "
                         f"you forgot to override `{p}`?"
                     )
+                else:
+                    args[k] = args.unique(k, candidate=v)
 
-        args = kwargs['args'] = args.reduce_all()
+        args.reduce_inplace()
+        kwargs['args'] = args
 
         for i in discretizations:
             args.update(i._arg_values(**kwargs))
@@ -749,10 +748,8 @@ class Operator(Callable):
         ret = set()
         for i in self.input:
             ret.update(i._arg_names)
-            try:
+            with suppress(AttributeError):
                 ret.update(i.grid._arg_names)
-            except AttributeError:
-                pass
         for d in self.dimensions:
             ret.update(d._arg_names)
         ret.update(p.name for p in self.parameters)
@@ -1002,11 +999,10 @@ class Operator(Callable):
         except ctypes.ArgumentError as e:
             if e.args[0].startswith("argument "):
                 argnum = int(e.args[0][9:].split(':')[0]) - 1
-                newmsg = "error in argument '%s' with value '%s': %s" % (
-                    self.parameters[argnum].name,
-                    arg_values[argnum],
-                    e.args[0])
-                raise ctypes.ArgumentError(newmsg) from e
+                raise ctypes.ArgumentError(
+                    f"error in argument '{self.parameters[argnum].name}' with value"
+                    f" '{arg_values[argnum]}': {e.args[0]}"
+                ) from e
             else:
                 raise
 
@@ -1057,7 +1053,7 @@ class Operator(Callable):
         _emit_timings(timings, '  * ')
 
         if self._profiler._ops:
-            ops = ['%d --> %d' % i for i in self._profiler._ops]
+            ops = [f'{i[0]} --> {i[1]}' for i in self._profiler._ops]
             perf(f"Flops reduction after symbolic optimization: [{' ; '.join(ops)}]")
 
     def _emit_apply_profiling(self, args):
@@ -1389,6 +1385,30 @@ class ArgumentsMap(dict):
         return nbytes
 
     @cached_property
+    def _physical_deviceid(self):
+        if isinstance(self.platform, Device):
+            # Get the physical device ID (as CUDA_VISIBLE_DEVICES may be set)
+            logical_deviceid = self.get('deviceid', -1)
+            if logical_deviceid < 0:
+                rank = self.comm.Get_rank() if self.comm != MPI.COMM_NULL else 0
+                logical_deviceid = rank
+
+            visible_device_var, visible_devices = get_visible_devices()
+            if visible_devices is None:
+                return logical_deviceid
+            else:
+                try:
+                    return visible_devices[logical_deviceid]
+                except IndexError as e:
+                    errmsg = (f"A deviceid value of {logical_deviceid} is not valid "
+                              f"with {visible_device_var}={visible_devices}. Note that "
+                              "deviceid corresponds to the logical index within the "
+                              "visible devices, not the physical device index.")
+                    raise ValueError(errmsg) from e
+        else:
+            return None
+
+    @cached_property
     def nbytes_avail_mapper(self):
         """
         The amount of memory available after accounting for the memory
@@ -1402,8 +1422,8 @@ class ArgumentsMap(dict):
 
         # The amount of space available on the device
         if isinstance(self.platform, Device):
-            deviceid = max(self.get('deviceid', 0), 0)
-            mapper[device_layer] = self.platform.memavail(deviceid=deviceid)
+            mapper[device_layer] = \
+                self.platform.memavail(deviceid=self._physical_deviceid)
 
         # The amount of space available on the host
         try:
@@ -1413,10 +1433,9 @@ class ArgumentsMap(dict):
         mapper[host_layer] = int(ANYCPU.memavail() / nproc)
 
         for layer in (host_layer, device_layer):
-            try:
+            with suppress(KeyError):
+                # Since might not have this layer in the mapper
                 mapper[layer] -= self.nbytes_consumed_operator.get(layer, 0)
-            except KeyError:  # Might not have this layer in the mapper
-                pass
 
         mapper = {k: int(v) for k, v in mapper.items()}
 
@@ -1479,10 +1498,7 @@ class ArgumentsMap(dict):
                or not i.is_regular:
                 continue
 
-            if i.is_regular:
-                nbytes = i.nbytes
-            else:
-                nbytes = i.nbytes_max
+            nbytes = i.nbytes if i.is_regular else i.nbytes_max
             v = subs_op_args(nbytes, self)
             if not is_integer(v):
                 # E.g. the Arrays used to store the MPI halo exchanges

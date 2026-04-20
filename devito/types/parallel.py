@@ -11,18 +11,39 @@ from ctypes import POINTER, c_void_p
 from functools import cached_property
 
 import numpy as np
+from sympy import Expr
 
 from devito.exceptions import InvalidArgument
 from devito.parameters import configuration
+from devito.symbolics import Reserved, Terminal, search
 from devito.tools import as_list, as_tuple, is_integer
 from devito.types.array import Array, ArrayObject
 from devito.types.basic import Scalar, Symbol
 from devito.types.dimension import CustomDimension
 from devito.types.misc import Fence, VolatileInt
 
-__all__ = ['NThreads', 'NThreadsNested', 'NThreadsNonaffine', 'NThreadsBase',
-           'DeviceID', 'ThreadID', 'Lock', 'ThreadArray', 'PThreadArray',
-           'SharedData', 'NPThreads', 'DeviceRM', 'QueueID', 'Barrier', 'TBArray']
+__all__ = [
+    'Barrier',
+    'DeviceID',
+    'DeviceRM',
+    'Lock',
+    'NPThreads',
+    'NThreads',
+    'NThreadsBase',
+    'NThreadsNested',
+    'NThreadsNonaffine',
+    'PThreadArray',
+    'QueueID',
+    'SharedData',
+    'TBArray',
+    'TensorMove',
+    'ThreadArray',
+    'ThreadArrive',
+    'ThreadCommit',
+    'ThreadID',
+    'ThreadPoolSync',
+    'ThreadWait',
+]
 
 
 class NThreadsAbstract(Scalar):
@@ -55,11 +76,11 @@ class NThreadsBase(NThreadsAbstract):
         try:
             npthreads = kwargs['metadata']['npthreads']
         except KeyError:
-            raise InvalidArgument("Cannot determine `npthreads`")
+            raise InvalidArgument("Cannot determine `npthreads`") from None
 
         # If a symbolic object, it must be resolved
-        if isinstance(npthreads, NPThreads):
-            npthreads = kwargs.get(npthreads.name, npthreads.size)
+        for th in search(npthreads, NPThreads):
+            npthreads = npthreads._subs(th, kwargs.get(th.name, th.size))
 
         return {self.name: max(base_nthreads - npthreads, 1)}
 
@@ -107,8 +128,9 @@ class NPThreads(NThreadsAbstract):
             if v < self.size:
                 return {self.name: v}
             else:
-                raise InvalidArgument("Illegal `%s=%d`. It must be `%s<%d`"
-                                      % (self.name, v, self.name, self.size))
+                raise InvalidArgument(
+                    f'Illegal `{self.name}={v}`. It must be `{self.name}<{self.size}`'
+                )
         else:
             return self._arg_defaults()
 
@@ -226,6 +248,8 @@ class Lock(Array):
 
     is_volatile = True
 
+    _symbol_prefix = 'lock'
+
     # Not a performance-sensitive object
     _data_alignment = False
 
@@ -234,10 +258,12 @@ class Lock(Array):
 
         dimensions = as_tuple(kwargs.get('dimensions'))
         if len(dimensions) != 1:
-            raise ValueError("Expected exactly one Dimension, got `%d`" % len(dimensions))
+            raise ValueError(
+                f'Expected exactly one Dimension, got `{len(dimensions)}`'
+            )
         d, = dimensions
         if not is_integer(d.symbolic_size):
-            raise ValueError("`%s` must have fixed size" % d)
+            raise ValueError(f"`{d}` must have fixed size")
         kwargs.setdefault('initvalue', np.full(d.symbolic_size, 2, dtype=np.int32))
 
         super().__init_finalize__(*args, **kwargs)
@@ -321,6 +347,50 @@ class Barrier(Fence):
     pass
 
 
+class ThreadPoolSync(Barrier):
+
+    """
+    A generic synchronization barrier for a pool of threads.
+    """
+
+    pass
+
+
+class ThreadCommit(Fence):
+
+    """
+    A generic commit operation for a single thread, typically used to issue
+    a memory operation at a specific program point, which requires the special
+    treatment that all Fence subclasses provide (i.e., to avoid being reshuffled
+    around by optimization passes).
+    """
+
+    pass
+
+
+class ThreadArrive(Fence):
+
+    """
+    A generic arrive operation for a single thread, typically used to signal
+    the arrival at a certain point through a suitable synchronization object.
+    """
+
+    pass
+
+
+class ThreadWait(Fence):
+
+    """
+    A generic wait operation for a single thread, typically used to synchronize
+    with other threads over:
+
+        * a memory operation issued by a prior ThreadCommit operation.
+        * the consumption of a shared resource via a ThreadArrive operation.
+    """
+
+    pass
+
+
 class TBArray(Array):
 
     """
@@ -331,3 +401,56 @@ class TBArray(Array):
         kwargs['liveness'] = 'eager'
 
         super().__init_finalize__(*args, **kwargs)
+
+
+class TensorMove(Expr, Reserved, Terminal):
+
+    """
+    Represent the LOAD/STORE of a multi-dimensional block of data from/to a higher
+    level of the memory hierarchy.
+
+    Parameters
+    ----------
+    base : IndexedBase
+        The base of the AbstractFunction subject of the TensorMove.
+    tid0 : Dimension
+        A representation of thread(s) issuing the TensorMove.
+    coords : tuple
+        The base address of the TensorMove (one point per Dimension).
+    """
+
+    __rargs__ = ('base', 'tid0', 'coords')
+
+    def __new__(cls, base, tid0, coords, **kwargs):
+        return super().__new__(cls, base, tid0, coords)
+
+    @property
+    def base(self):
+        return self.args[0]
+
+    @property
+    def tid0(self):
+        return self.args[1]
+
+    @property
+    def coords(self):
+        return self.args[2]
+
+    @property
+    def function(self):
+        return self.base.function
+
+    @cached_property
+    def indexed(self):
+        return self.function[self.coords]
+
+    @property
+    def ndim(self):
+        return self.function.ndim
+
+    func = Reserved._rebuild
+
+    def _ccode(self, printer):
+        return str(self)
+
+    _sympystr = _ccode

@@ -1,12 +1,27 @@
+from collections import namedtuple
 from ctypes import POINTER, Structure
 from functools import cached_property
 
 from devito.tools import EnrichedTuple, Tag
+
 # Additional Function-related APIs
 
-__all__ = ['Buffer', 'DimensionTuple', 'NODE', 'CELL', 'IgnoreDimSort',
-           'HierarchyLayer', 'HostLayer', 'DeviceLayer', 'DiskLayer',
-           'host_layer', 'device_layer', 'disk_layer']
+__all__ = [
+    'CELL',
+    'NODE',
+    'Buffer',
+    'DeviceLayer',
+    'DimensionTuple',
+    'DiskLayer',
+    'HierarchyLayer',
+    'HostLayer',
+    'IgnoreDimSort',
+    'Offset',
+    'Size',
+    'device_layer',
+    'disk_layer',
+    'host_layer',
+]
 
 
 class Buffer(Tag):
@@ -23,6 +38,10 @@ NODE = Stagger('node')  # noqa
 CELL = Stagger('cell')
 
 
+Size = namedtuple('Size', 'left right')
+Offset = namedtuple('Offset', 'left right')
+
+
 class DimensionTuple(EnrichedTuple):
 
     def __getitem_hook__(self, dim):
@@ -37,6 +56,15 @@ class Staggering(DimensionTuple):
     @cached_property
     def on_node(self):
         return not self or all(s == 0 for s in self)
+
+    @property
+    def _ref(self):
+        if not self:
+            return None
+        elif self.on_node:
+            return NODE
+        else:
+            return tuple(d for d, s in zip(self.getters, self, strict=True) if s == 1)
 
 
 class IgnoreDimSort(tuple):
@@ -69,7 +97,7 @@ class HierarchyLayer:
         self.suffix = suffix
 
     def __repr__(self):
-        return "Layer<%s>" % self.suffix
+        return f"Layer<{self.suffix}>"
 
     def __eq__(self, other):
         return (isinstance(other, HierarchyLayer) and

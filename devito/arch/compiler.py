@@ -1,28 +1,31 @@
+import platform
+import time
+import warnings
+from contextlib import suppress
 from functools import partial
 from hashlib import sha1
-from os import environ, path, makedirs
-from packaging.version import Version
-from subprocess import (DEVNULL, PIPE, CalledProcessError, check_output,
-                        check_call, run)
-import platform
-import warnings
-import time
+from itertools import filterfalse
+from os import environ, makedirs, path
+from subprocess import DEVNULL, PIPE, CalledProcessError, check_call, check_output, run
 
 import numpy.ctypeslib as npct
 from codepy.jit import compile_from_string
-from codepy.toolchain import (GCCToolchain,
-                              call_capture_output as _call_capture_output)
+from codepy.toolchain import GCCToolchain
+from codepy.toolchain import call_capture_output as _call_capture_output
+from packaging.version import Version
 
-from devito.arch import (AMDGPUX, Cpu64, AppleArm, NvidiaDevice, POWER8, POWER9,
-                         Graviton, Cortex, IntelDevice, get_nvidia_cc, NvidiaArm,
-                         check_cuda_runtime, get_m1_llvm_path)
+from devito.arch import (
+    AMDGPUX, POWER8, POWER9, AppleArm, Cortex, Cpu64, Graviton, IntelDevice, NvidiaArm,
+    NvidiaDevice, check_cuda_runtime, get_cuda_version, get_m1_llvm_path, get_nvidia_cc
+)
 from devito.exceptions import CompilationError
 from devito.logger import debug, warning
 from devito.parameters import configuration
-from devito.tools import (as_list, change_directory, filter_ordered,
-                          memoized_func, make_tempdir)
+from devito.tools import (
+    as_list, change_directory, filter_ordered, make_tempdir, memoized_func
+)
 
-__all__ = ['sniff_mpi_distro', 'compiler_registry']
+__all__ = ['compiler_registry', 'sniff_mpi_distro']
 
 
 @memoized_func
@@ -41,20 +44,20 @@ def sniff_compiler_version(cc, allow_fail=False):
             return Version("0")
     except UnicodeDecodeError:
         return Version("0")
-    except OSError:
+    except OSError as e:
         if allow_fail:
             return Version("0")
         else:
-            raise RuntimeError(f"The `{cc}` compiler isn't available on this system")
+            raise RuntimeError(
+                f"The `{cc}` compiler isn't available on this system"
+            ) from e
 
     ver = ver.strip()
     if ver.startswith("gcc"):
         compiler = "gcc"
-    elif ver.startswith("clang"):
-        compiler = "clang"
-    elif ver.startswith("Apple LLVM"):
-        compiler = "clang"
-    elif ver.startswith("Homebrew clang"):
+    elif ver.startswith("clang") \
+            or ver.startswith("Apple LLVM") \
+            or ver.startswith("Homebrew clang"):
         compiler = "clang"
     elif ver.startswith("Intel"):
         compiler = "icx"
@@ -63,7 +66,10 @@ def sniff_compiler_version(cc, allow_fail=False):
     elif ver.startswith("icx"):
         compiler = "icx"
     elif ver.startswith("pgcc"):
-        compiler = "pgcc"
+        raise CompilationError(
+            'Portland compiler no longer supported,'
+            ' use `nvc` from the nvidia HPC SDK instead'
+        )
     elif ver.startswith("nvc++"):
         compiler = "nvc"
     elif ver.startswith("cray"):
@@ -91,10 +97,8 @@ def sniff_compiler_version(cc, allow_fail=False):
             pass
 
     # Pure integer versions (e.g., ggc5, rather than gcc5.0) need special handling
-    try:
+    with suppress(TypeError):
         ver = Version(float(ver))
-    except TypeError:
-        pass
 
     return ver
 
@@ -334,22 +338,21 @@ class Compiler(GCCToolchain):
         logfile = path.join(self.get_jit_dir(), f"{hash_key}.log")
         errfile = path.join(self.get_jit_dir(), f"{hash_key}.err")
 
-        with change_directory(loc):
-            with open(logfile, "w") as lf:
-                with open(errfile, "w") as ef:
-
-                    command = ['make'] + args
-                    lf.write("Compilation command:\n")
-                    lf.write(" ".join(command))
-                    lf.write("\n\n")
-                    try:
-                        check_call(command, stderr=ef, stdout=lf)
-                    except CalledProcessError as e:
-                        raise CompilationError(f'Command "{e.cmd}" return error status'
-                                               f'{e.returncode}. '
-                                               f'Unable to compile code.\n'
-                                               f'Compile log in {logfile}\n'
-                                               f'Compile errors in {errfile}\n')
+        with change_directory(loc), open(logfile, "w") as lf, open(errfile, "w") as ef:
+            command = ['make'] + args
+            lf.write("Compilation command:\n")
+            lf.write(" ".join(command))
+            lf.write("\n\n")
+            try:
+                check_call(command, stderr=ef, stdout=lf)
+            except CalledProcessError as e:
+                raise CompilationError(
+                    f'Command "{e.cmd}" return error status'
+                    f'{e.returncode}. '
+                    f'Unable to compile code.\n'
+                    f'Compile log in {logfile}\n'
+                    f'Compile errors in {errfile}\n'
+                ) from e
         debug(f"Make <{' '.join(args)}>")
 
     def _cmdline(self, files, object=False):
@@ -383,11 +386,19 @@ class Compiler(GCCToolchain):
             # Typically we end up here
             # Make a suite of cache directories based on the soname
             cache_dir.mkdir(parents=True, exist_ok=True)
+
+            # Has the library already been compiled?
+            try:
+                self.load(target)
+                return False, src_file
+            except OSError:
+                # The .so file isn't present, we need to compile it
+                pass
         else:
             # Warning: dropping `code` on the floor in favor to whatever is written
             # within `src_file`
             try:
-                with open(src_file, 'r') as f:
+                with open(src_file) as f:
                     code = f.read()
                     code = f'{code}/* Backdoor edit at {time.ctime()}*/ \n'
                 # Bypass the devito JIT cache
@@ -395,9 +406,11 @@ class Compiler(GCCToolchain):
                 # ranks would end up creating different cache dirs
                 cache_dir = cache_dir.joinpath('jit-backdoor')
                 cache_dir.mkdir(parents=True, exist_ok=True)
-            except FileNotFoundError:
-                raise ValueError(f"Trying to use the JIT backdoor for `{src_file}`, but "
-                                 "the file isn't present")
+            except FileNotFoundError as e:
+                raise ValueError(
+                    f"Trying to use the JIT backdoor for `{src_file}`, but "
+                    "the file isn't present"
+                ) from e
 
         # Should the compilation command be emitted?
         debug = configuration['log-level'] == 'DEBUG'
@@ -626,7 +639,7 @@ class DPCPPCompiler(Compiler):
         self.MPICXX = 'mpicxx'
 
 
-class PGICompiler(Compiler):
+class NvidiaCompiler(Compiler):
 
     _default_cpp = True
 
@@ -656,24 +669,40 @@ class PGICompiler(Compiler):
 
         if not configuration['safe-math']:
             self.cflags.append('-fast')
-        # Default PGI compile for a target is GPU and single threaded host.
+        # Default compile for a target is GPU and single threaded host.
         # self.cflags += ['-ta=tesla,host']
 
     def __lookup_cmds__(self):
-        # NOTE: using `pgc++` instead of `pgcc` because of issue #1219
-        self.CC = 'pgc++'
-        self.CXX = 'pgc++'
-        self.MPICC = 'mpic++'
-        self.MPICXX = 'mpicxx'
-
-
-class NvidiaCompiler(PGICompiler):
-
-    def __lookup_cmds__(self):
+        # Note: Using `nvc++` instead of `nvcc` because of issue #1219
         self.CC = 'nvc++'
         self.CXX = 'nvc++'
         self.MPICC = 'mpic++'
         self.MPICXX = 'mpicxx'
+
+    def add_libraries(self, libs):
+        # Urgh...
+        # NvidiaCompiler inherits from Compiler inherits from GCCToolchain in codepy
+        # And _GCC_ supports linking versioned shared objects with the syntax:
+        # `gcc -L/path/to/versioned/lib -l:libfoo.so.2.0 ...`
+        # But this syntax is not supported by the Nvidia compiler.
+        # Nor does `codepy.GCCToolchain` understand that linking to versioned objects
+        # is a thing that someone might want to do.
+        #
+        # Since this is just linking information, we can just tell the linker
+        # (which we invoke using the compiler and the `-Wl,-options` syntax) to
+        # go and look in all of the directories we have provided thus far and
+        # the linker supports the syntax:
+        # `ld -L/path/to/versioned/lib -l:libfoo.so.2.0 ...`
+        #
+        # Note: It would be nicer to just look in the one _relevant_ lib dir!
+        new = as_list(libs)
+        versioned = filter(lambda s: s.startswith(':'), new)
+        versioned = map(lambda s: s.removeprefix(':'), versioned)
+        self.add_ldflags([
+            f'-Wl,-L{",-L".join(map(str, self.library_dirs))},-l:{soname}'
+            for soname in versioned
+        ])
+        super().add_libraries(filterfalse(lambda s: s.startswith(':'), new))
 
 
 class CudaCompiler(Compiler):
@@ -692,12 +721,10 @@ class CudaCompiler(Compiler):
             # explicitly pass the flags that an `mpicc` would implicitly use
             compile_flags, link_flags = sniff_mpi_flags('mpicxx')
 
-            try:
+            with suppress(ValueError):
                 # No idea why `-pthread` would pop up among the `compile_flags`
+                # Just in case they fix it, we wrap it up within a suppress
                 compile_flags.remove('-pthread')
-            except ValueError:
-                # Just in case they fix it, we wrap it up within a try-except
-                pass
             self.cflags.extend(compile_flags)
 
             # Some arguments are for the host compiler
@@ -748,6 +775,12 @@ class CudaCompiler(Compiler):
         # garbage, since the CUDA kernel behaviour would be undefined
         check_cuda_runtime()
 
+    @property
+    def std(self):
+        # Since CUDA 13, code needs compiling with C++17 standard
+        _cxxstd = 'c++17' if get_cuda_version().major >= 13 else 'c++14'
+        return _cxxstd if self._cpp else self._cstd
+
     def __lookup_cmds__(self):
         self.CC = 'nvcc'
         self.CXX = 'nvcc'
@@ -760,6 +793,7 @@ class HipCompiler(Compiler):
     _default_cpp = True
 
     def __init_finalize__(self, **kwargs):
+        self.cflags.append('-Wno-unused-result')
 
         if configuration['mpi']:
             # We rather use `hipcc` to compile MPI, but for this we have to
@@ -772,6 +806,23 @@ class HipCompiler(Compiler):
                 self.cflags.append('-DHIP_FAST_MATH')
 
         self.src_ext = 'cpp'
+
+    @property
+    def version(self):
+        try:
+            res = run(['hipconfig', "--version"], stdout=PIPE, stderr=DEVNULL)
+            ver = res.stdout.decode("utf-8").split('-')[0]
+            ver = Version(ver)
+        except (UnicodeDecodeError, OSError):
+            ver = Version("0")
+        return ver
+
+    @property
+    def _cxxstd(self):
+        if self.version >= Version("7.0.0"):
+            return 'c++17'
+        else:
+            return 'c++14'
 
     def __lookup_cmds__(self):
         self.CC = 'hipcc'
@@ -965,15 +1016,9 @@ class CustomCompiler(Compiler):
         elif isinstance(platform, IntelDevice):
             _base = OneapiCompiler
         elif isinstance(platform, NvidiaDevice):
-            if language == 'cuda':
-                _base = CudaCompiler
-            else:
-                _base = NvidiaCompiler
+            _base = CudaCompiler if language == 'cuda' else NvidiaCompiler
         elif platform is AMDGPUX:
-            if language == 'hip':
-                _base = HipCompiler
-            else:
-                _base = AOMPCompiler
+            _base = HipCompiler if language == 'hip' else AOMPCompiler
         else:
             _base = GNUCompiler
 
@@ -987,14 +1032,14 @@ class CustomCompiler(Compiler):
         self._base.__init_finalize__(self, **kwargs)
         # Update cflags
         try:
-            extrac = environ.get('CFLAGS').split(' ')
-            self.cflags = self.cflags + extrac
+            extra_c = environ.get('CFLAGS').split(' ')
+            self.cflags = self.cflags + extra_c
         except AttributeError:
             pass
         # Update ldflags
         try:
-            extrald = environ.get('LDFLAGS').split(' ')
-            self.ldflags = self.ldflags + extrald
+            extra_ld = environ.get('LDFLAGS').split(' ')
+            self.ldflags = self.ldflags + extra_ld
         except AttributeError:
             pass
 
@@ -1047,8 +1092,6 @@ _compiler_registry = {
     'aomp': AOMPCompiler,
     'amdclang': AOMPCompiler,
     'hip': HipCompiler,
-    'pgcc': PGICompiler,
-    'pgi': PGICompiler,
     'nvc': NvidiaCompiler,
     'nvc++': NvidiaCompiler,
     'nvidia': NvidiaCompiler,

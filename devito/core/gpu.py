@@ -6,21 +6,34 @@ from devito.core.operator import CoreOperator, CustomOperator, ParTile
 from devito.exceptions import InvalidOperator
 from devito.operator.operator import rcompile
 from devito.passes import is_on_device, stream_dimensions
+from devito.passes.clusters import (
+    Lift, blocking, buffering, cire, cse, factorize, fission, fuse, memcpy_prefetch,
+    optimize_pows, tasking
+)
 from devito.passes.equations import collect_derivatives
-from devito.passes.clusters import (Lift, tasking, memcpy_prefetch, blocking,
-                                    buffering, cire, cse, factorize, fission, fuse,
-                                    optimize_pows)
-from devito.passes.iet import (DeviceOmpTarget, DeviceAccTarget, DeviceCXXOmpTarget,
-                               mpiize, hoist_prodders, linearize, pthreadify,
-                               relax_incr_dimensions, check_stability)
+from devito.passes.iet import (
+    DeviceAccTarget, DeviceCXXOmpTarget, DeviceOmpTarget, check_stability, hoist_prodders,
+    linearize, mpiize, pthreadify, relax_incr_dimensions
+)
 from devito.tools import as_tuple, timed_pass
 
-__all__ = ['DeviceNoopOperator', 'DeviceAdvOperator', 'DeviceCustomOperator',
-           'DeviceNoopOmpOperator', 'DeviceAdvOmpOperator', 'DeviceFsgOmpOperator',
-           'DeviceCustomOmpOperator', 'DeviceNoopAccOperator', 'DeviceAdvAccOperator',
-           'DeviceFsgAccOperator', 'DeviceCustomAccOperator', 'DeviceNoopCXXOmpOperator',
-           'DeviceAdvCXXOmpOperator', 'DeviceFsgCXXOmpOperator',
-           'DeviceCustomCXXOmpOperator']
+__all__ = [
+    'DeviceAdvAccOperator',
+    'DeviceAdvCXXOmpOperator',
+    'DeviceAdvOmpOperator',
+    'DeviceAdvOperator',
+    'DeviceCustomAccOperator',
+    'DeviceCustomCXXOmpOperator',
+    'DeviceCustomOmpOperator',
+    'DeviceCustomOperator',
+    'DeviceFsgAccOperator',
+    'DeviceFsgCXXOmpOperator',
+    'DeviceFsgOmpOperator',
+    'DeviceNoopAccOperator',
+    'DeviceNoopCXXOmpOperator',
+    'DeviceNoopOmpOperator',
+    'DeviceNoopOperator',
+]
 
 
 class DeviceOperatorMixin:
@@ -68,6 +81,7 @@ class DeviceOperatorMixin:
         o['cire-maxpar'] = oo.pop('cire-maxpar', True)
         o['cire-ftemps'] = oo.pop('cire-ftemps', False)
         o['cire-mingain'] = oo.pop('cire-mingain', cls.CIRE_MINGAIN)
+        o['cire-minmem'] = oo.pop('cire-minmem', cls.CIRE_MINMEM)
         o['cire-schedule'] = oo.pop('cire-schedule', cls.CIRE_SCHEDULE)
 
         # GPU parallelism
@@ -88,6 +102,7 @@ class DeviceOperatorMixin:
 
         # Code generation options for derivatives
         o['expand'] = oo.pop('expand', cls.EXPAND)
+        o['deriv-collect'] = oo.pop('deriv-collect', cls.DERIV_COLLECT)
         o['deriv-schedule'] = oo.pop('deriv-schedule', cls.DERIV_SCHEDULE)
         o['deriv-unroll'] = oo.pop('deriv-unroll', False)
 
@@ -101,8 +116,9 @@ class DeviceOperatorMixin:
         o['scalar-min-type'] = oo.pop('scalar-min-type', cls.SCALAR_MIN_TYPE)
 
         if oo:
-            raise InvalidOperator("Unsupported optimization options: [%s]"
-                                  % ", ".join(list(oo)))
+            raise InvalidOperator(
+                f'Unsupported optimization options: [{", ".join(list(oo))}]'
+            )
 
         kwargs['options'].update(o)
 
@@ -164,18 +180,13 @@ class DeviceNoopOperator(DeviceOperatorMixin, CoreOperator):
     @classmethod
     @timed_pass(name='specializing.IET')
     def _specialize_iet(cls, graph, **kwargs):
-        options = kwargs['options']
-        platform = kwargs['platform']
-        compiler = kwargs['compiler']
-        sregistry = kwargs['sregistry']
-
         # Distributed-memory parallelism
         mpiize(graph, **kwargs)
 
         # GPU parallelism
-        parizer = cls._Target.Parizer(sregistry, options, platform, compiler)
+        parizer = cls._Target.Parizer(**kwargs)
         parizer.make_parallel(graph)
-        parizer.initialize(graph, options=options)
+        parizer.initialize(graph)
 
         # Symbol definitions
         cls._Target.DataManager(**kwargs).process(graph)
@@ -188,7 +199,7 @@ class DeviceAdvOperator(DeviceOperatorMixin, CoreOperator):
     @classmethod
     @timed_pass(name='specializing.DSL')
     def _specialize_dsl(cls, expressions, **kwargs):
-        expressions = collect_derivatives(expressions)
+        expressions = collect_derivatives(expressions, **kwargs)
 
         return expressions
 
@@ -216,7 +227,6 @@ class DeviceAdvOperator(DeviceOperatorMixin, CoreOperator):
         # Reduce flops
         clusters = cire(clusters, 'sops', sregistry, options, platform)
         clusters = factorize(clusters, **kwargs)
-        clusters = optimize_pows(clusters)
 
         # The previous passes may have created fusion opportunities
         clusters = fuse(clusters)
@@ -233,11 +243,6 @@ class DeviceAdvOperator(DeviceOperatorMixin, CoreOperator):
     @classmethod
     @timed_pass(name='specializing.IET')
     def _specialize_iet(cls, graph, **kwargs):
-        options = kwargs['options']
-        platform = kwargs['platform']
-        compiler = kwargs['compiler']
-        sregistry = kwargs['sregistry']
-
         # Distributed-memory parallelism
         mpiize(graph, **kwargs)
 
@@ -245,9 +250,9 @@ class DeviceAdvOperator(DeviceOperatorMixin, CoreOperator):
         relax_incr_dimensions(graph, **kwargs)
 
         # GPU parallelism
-        parizer = cls._Target.Parizer(sregistry, options, platform, compiler)
+        parizer = cls._Target.Parizer(**kwargs)
         parizer.make_parallel(graph)
-        parizer.initialize(graph, options=options)
+        parizer.initialize(graph)
 
         # Misc optimizations
         hoist_prodders(graph)
@@ -280,7 +285,7 @@ class DeviceCustomOperator(DeviceOperatorMixin, CustomOperator):
     @classmethod
     def _make_dsl_passes_mapper(cls, **kwargs):
         return {
-            'collect-derivs': collect_derivatives,
+            'deriv-collect': collect_derivatives,
         }
 
     @classmethod
@@ -310,27 +315,22 @@ class DeviceCustomOperator(DeviceOperatorMixin, CustomOperator):
 
     @classmethod
     def _make_iet_passes_mapper(cls, **kwargs):
-        options = kwargs['options']
-        platform = kwargs['platform']
-        compiler = kwargs['compiler']
-        sregistry = kwargs['sregistry']
-
-        parizer = cls._Target.Parizer(sregistry, options, platform, compiler)
+        parizer = cls._Target.Parizer(**kwargs)
         orchestrator = cls._Target.Orchestrator(**kwargs)
 
         return {
             'parallel': parizer.make_parallel,
             'orchestrate': partial(orchestrator.process),
-            'pthreadify': partial(pthreadify, sregistry=sregistry),
+            'pthreadify': partial(pthreadify, **kwargs),
             'mpi': partial(mpiize, **kwargs),
             'linearize': partial(linearize, **kwargs),
             'prodders': partial(hoist_prodders),
-            'init': partial(parizer.initialize, options=options)
+            'init': partial(parizer.initialize)
         }
 
     _known_passes = (
         # DSL
-        'collect-derivs',
+        'deriv-collect',
         # Expressions
         'buffering',
         # Clusters

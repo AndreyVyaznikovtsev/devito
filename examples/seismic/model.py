@@ -1,9 +1,7 @@
+from contextlib import suppress
+
 import numpy as np
 from sympy import finite_diff_weights as fd_w
-try:
-    import pytest
-except:
-    pass
 
 from devito import (Grid, SubDomain, Function, Constant, warning,
                     SubDimension, Eq, Inc, Operator, div, sin, Abs, NODE)
@@ -33,11 +31,11 @@ def initialize_damp(damp, padsizes, spacing, abc_type="damp", fs=False):
     """
 
     eqs = [Eq(damp, 1.0 if abc_type == "mask" else 0.0)]
-    for (nbl, nbr), d in zip(padsizes, damp.dimensions):
+    for (nbl, nbr), d in zip(padsizes, damp.dimensions, strict=True):
         if not fs or d is not damp.dimensions[-1]:
             dampcoeff = 1.5 * np.log(1.0 / 0.001) / (nbl)
             # left
-            dim_l = SubDimension.left(name='abc_%s_l' % d.name, parent=d,
+            dim_l = SubDimension.left(name=f'abc_{d.name}_l', parent=d,
                                       thickness=nbl)
             pos = Abs((nbl - (dim_l - d.symbolic_min) + 1) / float(nbl))
             val = dampcoeff * (pos - sin(2*np.pi*pos)/(2*np.pi))
@@ -45,7 +43,7 @@ def initialize_damp(damp, padsizes, spacing, abc_type="damp", fs=False):
             eqs += [Inc(damp.subs({d: dim_l}), val/d.spacing)]
         # right
         dampcoeff = 1.5 * np.log(1.0 / 0.001) / (nbr)
-        dim_r = SubDimension.right(name='abc_%s_r' % d.name, parent=d,
+        dim_r = SubDimension.right(name=f'abc_{d.name}_r', parent=d,
                                    thickness=nbr)
         pos = Abs((nbr - (d.symbolic_max - dim_r) + 1) / float(nbr))
         val = dampcoeff * (pos - sin(2*np.pi*pos)/(2*np.pi))
@@ -84,7 +82,7 @@ class FSDomain(SubDomain):
         Definition of the upper section of the domain for wrapped indices FS.
         """
 
-        return {d: (d if not d == dimensions[-1] else ('left', self.size))
+        return {d: (d if d != dimensions[-1] else ('left', self.size))
                 for d in dimensions}
 
 
@@ -101,7 +99,7 @@ class GenericModel:
         self.origin = tuple([dtype(o) for o in origin])
         self.fs = fs
         # Default setup
-        origin_pml = [dtype(o - s*nbl) for o, s in zip(origin, spacing)]
+        origin_pml = [dtype(o - s*nbl) for o, s in zip(origin, spacing, strict=True)]
         shape_pml = np.array(shape) + 2 * self.nbl
 
         # Model size depending on freesurface
@@ -146,9 +144,9 @@ class GenericModel:
             if init or re_init:
                 if re_init and not init:
                     bcs_o = "damp" if bcs == "mask" else "mask"
-                    warning("Re-initializing damp profile from %s to %s" % (bcs_o, bcs))
-                    warning("Model has to be created with `bcs=\"%s\"`"
-                            "for this WaveSolver" % bcs)
+                    warning(f"Re-initializing damp profile from {bcs_o} to {bcs}")
+                    warning(f"Model has to be created with `bcs=\"{bcs}\"`"
+                            "for this WaveSolver")
                 initialize_damp(self.damp, self.padsizes, self.spacing,
                                 abc_type=bcs, fs=self.fs)
         self._physical_parameters.update(['damp'])
@@ -219,7 +217,7 @@ class GenericModel:
     @property
     def dtype(self):
         """
-        Data type for all assocaited data objects.
+        Data type for all associated data objects.
         """
         return self.grid.dtype
 
@@ -228,7 +226,7 @@ class GenericModel:
         """
         Physical size of the domain as determined by shape and spacing
         """
-        return tuple((d-1) * s for d, s in zip(self.shape, self.spacing))
+        return tuple((d-1) * s for d, s in zip(self.shape, self.spacing, strict=True))
 
 
 class SeismicModel(GenericModel):
@@ -284,10 +282,10 @@ class SeismicModel(GenericModel):
 
         # User provided dt
         self._dt = kwargs.get('dt')
-        # Some wave equation need a rescaled dt that can't be infered from the model
+        # Some wave equation need a rescaled dt that can't be inferred from the model
         # parameters, such as isoacoustic OT4 that can use a dt sqrt(3) larger than
         # isoacoustic OT2. This property should be set from a wavesolver or after model
-        # instanciation only via model.dt_scale = value.
+        # instantiation only via model.dt_scale = value.
         self._dt_scale = 1
 
     def _initialize_physics(self, vp, space_order, **kwargs):
@@ -308,10 +306,9 @@ class SeismicModel(GenericModel):
         # Initialize elastic with Lame parametrization
         if 'vs' in kwargs:
             vs = kwargs.pop('vs')
-            self.lam = self._gen_phys_param((vp**2 - 2. * vs**2)/b, 'lam', space_order,
-                                            is_param=True)
-            self.mu = self._gen_phys_param(vs**2 / b, 'mu', space_order, is_param=True,
-                                           avg_mode='harmonic')
+            self.lam = self._gen_phys_param((vp**2 - 2. * vs**2)/b, 'lam', space_order)
+            self.mu = self._gen_phys_param(vs**2 / b, 'mu', space_order,
+                                           avg_mode='safe_harmonic')
         else:
             # All other seismic models have at least a velocity
             self.vp = self._gen_phys_param(vp, 'vp', space_order)
@@ -368,7 +365,7 @@ class SeismicModel(GenericModel):
         """
         # For a fixed time order this number decreases as the space order increases.
         #
-        # The CFL condtion is then given by
+        # The CFL condition is then given by
         # dt <= coeff * h / (max(velocity))
         dt = self._cfl_coeff * np.min(self.spacing) / (self._thomsen_scale*self._max_vp)
         dt = self.dtype("%.3e" % (self.dt_scale * dt))
@@ -383,7 +380,7 @@ class SeismicModel(GenericModel):
         try:
             param = getattr(self, name)
         except AttributeError:
-            # No physical parameter with tha name, create it
+            # No physical parameter with that name, create it
             setattr(self, name, self._gen_phys_param(value, name, self.space_order))
             return
         # Update the physical parameter according to new value
@@ -393,9 +390,8 @@ class SeismicModel(GenericModel):
             elif value.shape == self.shape:
                 initialize_function(param, value, self.nbl)
             else:
-                raise ValueError("Incorrect input size %s for model" % value.shape +
-                                 " %s without or %s with padding" % (self.shape,
-                                                                     param.shape))
+                raise ValueError(f"Incorrect input size {value.shape} for model" +
+                                 f" {self.shape} without or {param.shape} with padding")
         else:
             param.data = value
 

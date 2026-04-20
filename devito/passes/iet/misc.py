@@ -6,20 +6,27 @@ import sympy
 
 from devito.finite_differences import Max, Min
 from devito.finite_differences.differentiable import SafeInv
-from devito.logger import warning
-from devito.ir import (Any, Forward, DummyExpr, Iteration, EmptyList, Prodder,
-                       FindApplications, FindNodes, FindSymbols, Transformer,
-                       Uxreplace, filter_iterations, retrieve_iteration_tree,
-                       pull_dims)
+from devito.ir import (
+    Any, DummyExpr, EmptyList, FindApplications, FindNodes, FindSymbols, Forward,
+    Iteration, Prodder, Transformer, Uxreplace, filter_iterations, pull_dims,
+    retrieve_iteration_tree
+)
+from devito.ir.iet.efunc import DeviceFunction, EntryFunction
 from devito.passes.iet.engine import iet_pass
 from devito.passes.iet.languages.C import CPrinter
-from devito.ir.iet.efunc import DeviceFunction, EntryFunction
-from devito.symbolics import (ValueLimit, evalrel, has_integer_args, limits_mapper, Cast)
-from devito.tools import Bunch, as_mapper, filter_ordered, split, as_tuple
+from devito.symbolics import (
+    Cast, RoundUp, ValueLimit, evalrel, has_integer_args, limits_mapper
+)
+from devito.tools import Bunch, as_mapper, as_tuple, filter_ordered, split
 from devito.types import FIndexed
 
-__all__ = ['avoid_denormals', 'hoist_prodders', 'relax_incr_dimensions',
-           'generate_macros', 'minimize_symbols']
+__all__ = [
+    'avoid_denormals',
+    'generate_macros',
+    'hoist_prodders',
+    'minimize_symbols',
+    'relax_incr_dimensions',
+]
 
 
 @iet_pass
@@ -114,7 +121,7 @@ def relax_incr_dimensions(iet, options=None, **kwargs):
         roots_max = {i.dim.root: i.symbolic_max for i in outer}
 
         # Process inner iterations and adjust their bounds
-        for n, i in enumerate(inner):
+        for _, i in enumerate(inner):
             # If definitely in-bounds, as ensured by a prior compiler pass, then
             # we can skip this step
             if i.is_Inbound:
@@ -155,7 +162,7 @@ def _generate_macros(iet, tracker=None, langbb=None, printer=CPrinter, **kwargs)
                      for define, expr in headers)
 
     # Generate Macros from higher-level SymPy objects
-    mheaders, includes = _generate_macros_math(iet, langbb=langbb)
+    mheaders, includes = _generate_macros_math(iet, langbb=langbb, printer=printer)
     includes = sorted(includes, key=str)
     headers.extend(sorted(mheaders, key=str))
 
@@ -188,7 +195,7 @@ def _generate_macros_findexeds(iet, sregistry=None, tracker=None, **kwargs):
         except KeyError:
             pass
 
-        pname = sregistry.make_name(prefix='%sL' % i.name)
+        pname = sregistry.make_name(prefix=f'{i.name}L')
         header, v = i.bind(pname)
 
         subs[i] = v
@@ -199,11 +206,11 @@ def _generate_macros_findexeds(iet, sregistry=None, tracker=None, **kwargs):
     return iet
 
 
-def _generate_macros_math(iet, langbb=None):
+def _generate_macros_math(iet, langbb=None, printer=CPrinter):
     headers = []
     includes = []
     for i in FindApplications().visit(iet):
-        header, include = _lower_macro_math(i, langbb)
+        header, include = _lower_macro_math(i, langbb, printer)
         headers.extend(header)
         includes.extend(include)
 
@@ -211,13 +218,13 @@ def _generate_macros_math(iet, langbb=None):
 
 
 @singledispatch
-def _lower_macro_math(expr, langbb):
+def _lower_macro_math(expr, langbb, printer):
     return (), {}
 
 
 @_lower_macro_math.register(Min)
 @_lower_macro_math.register(sympy.Min)
-def _(expr, langbb):
+def _(expr, langbb, printer):
     if has_integer_args(*expr.args):
         return (('MIN(a,b)', ('(((a) < (b)) ? (a) : (b))')),), {}
     else:
@@ -226,7 +233,7 @@ def _(expr, langbb):
 
 @_lower_macro_math.register(Max)
 @_lower_macro_math.register(sympy.Max)
-def _(expr, langbb):
+def _(expr, langbb, printer):
     if has_integer_args(*expr.args):
         return (('MAX(a,b)', ('(((a) > (b)) ? (a) : (b))')),), {}
     else:
@@ -234,21 +241,32 @@ def _(expr, langbb):
 
 
 @_lower_macro_math.register(SafeInv)
-def _(expr, langbb):
+def _(expr, langbb, printer):
     try:
-        eps = np.finfo(expr.base.dtype).resolution**2
-    except ValueError:
-        warning(f"dtype not recognized in SafeInv for {expr.base}, assuming float32")
-        eps = np.finfo(np.float32).resolution**2
-    b = Cast('b', dtype=np.float32)
+        dtype = expr.base.dtype
+        eps = np.finfo(dtype).resolution**2
+    except (AttributeError, ValueError):
+        dtype = np.float32
+        eps = np.finfo(dtype).resolution**2
+
+    b = printer()._print(Cast('b', dtype=dtype))
+    ext = 'F' if dtype is np.float32 else ''
+
     return (('SAFEINV(a, b)',
-             f'(((a) < {eps}F || ({b}) < {eps}F) ? (0.0F) : ((1.0F) / (a)))'),), {}
+             f'(((a) < {eps}{ext} || ({b}) < {eps}{ext}) ? '
+             f'(0.0{ext}) : ((1.0{ext}) / (a)))'),), {}
+
+
+@_lower_macro_math.register(RoundUp)
+def _(expr, langbb, printer):
+    return (('ROUND_UP(a,b)',
+             '((((a)%(b)) == 0) ? (a) : ((a) + (b) - ((a)%(b))))'),), {}
 
 
 @iet_pass
 def minimize_symbols(iet):
     """
-    Remove unneccesary symbols. Currently applied sub-passes:
+    Remove unnecessary symbols. Currently applied sub-passes:
 
         * Remove redundant ModuloDimensions (e.g., due to using the
           `save=Buffer(2)` API)
@@ -274,7 +292,7 @@ def remove_redundant_moddims(iet):
     subs = {d: sympy.S.Zero for d in degenerates}
 
     redundants = as_mapper(others, key=lambda d: d.offset % d.modulo)
-    for k, v in redundants.items():
+    for _, v in redundants.items():
         chosen = v.pop(0)
         subs.update({d: chosen for d in v})
 

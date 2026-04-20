@@ -1,25 +1,33 @@
 from collections import defaultdict
+from contextlib import suppress
 from functools import cached_property
 
-import numpy as np
 import cgen as c
+import numpy as np
 from sympy import And, Max, true
 
 from devito.data import FULL
-from devito.ir import (Conditional, DummyEq, Dereference, Expression,
-                       ExpressionBundle, FindSymbols, FindNodes, ParallelIteration,
-                       ParallelTree, Pragma, Prodder, Transfer, List, Transformer,
-                       IsPerfectIteration, OpInc, filter_iterations, ccode,
-                       retrieve_iteration_tree, IMask, VECTORIZED)
+from devito.ir import (
+    VECTORIZED, Conditional, Dereference, DummyEq, Expression, ExpressionBundle,
+    FindNodes, FindSymbols, IMask, IsPerfectIteration, List, OpInc, ParallelIteration,
+    ParallelTree, Pragma, Prodder, Transfer, Transformer, ccode, filter_iterations,
+    retrieve_iteration_tree
+)
 from devito.passes.iet.engine import iet_pass
-from devito.passes.iet.langbase import (LangBB, LangTransformer, DeviceAwareMixin,
-                                        ShmTransformer, make_sections_from_imask)
+from devito.passes.iet.langbase import (
+    DeviceAwareMixin, LangBB, LangTransformer, ShmTransformer, make_sections_from_imask
+)
 from devito.symbolics import INT
 from devito.tools import as_tuple, flatten, is_integer, prod
 from devito.types import Symbol
 
-__all__ = ['PragmaSimdTransformer', 'PragmaShmTransformer',
-           'PragmaDeviceAwareTransformer', 'PragmaLangBB', 'PragmaTransfer']
+__all__ = [
+    'PragmaDeviceAwareTransformer',
+    'PragmaLangBB',
+    'PragmaShmTransformer',
+    'PragmaSimdTransformer',
+    'PragmaTransfer',
+]
 
 
 class PragmaTransformer(LangTransformer):
@@ -41,6 +49,10 @@ class PragmaSimdTransformer(PragmaTransformer):
     @classmethod
     def _support_array_reduction(cls, compiler):
         return True
+
+    @classmethod
+    def _support_complex_reduction(cls, compiler):
+        return False
 
     @property
     def simd_reg_nbytes(self):
@@ -179,21 +191,21 @@ class PragmaIteration(ParallelIteration):
             if i.is_Indexed:
                 f = i.function
                 bounds = []
-                for k, d in zip(imask, f.dimensions):
+                for k, d in zip(imask, f.dimensions, strict=False):
                     if is_integer(k):
-                        bounds.append('[%s]' % k)
+                        bounds.append(f'[{k}]')
                     elif k is FULL:
                         # Lower FULL Dimensions into a range spanning the entire
                         # Dimension space, e.g. `reduction(+:f[0:f_vec->size[1]])`
-                        bounds.append('[0:%s]' % f._C_get_field(FULL, d).size)
+                        bounds.append(f'[0:{f._C_get_field(FULL, d).size}]')
                     else:
                         assert isinstance(k, tuple) and len(k) == 2
-                        bounds.append('[%s:%s]' % k)
-                mapper[r.name].append('%s%s' % (i.name, ''.join(bounds)))
+                        bounds.append('[{}:{}]'.format(*k))
+                mapper[r.name].append('{}{}'.format(i.name, ''.join(bounds)))
             else:
                 mapper[r.name].append(str(i))
 
-        args = ['reduction(%s:%s)' % (k, ','.join(v)) for k, v in mapper.items()]
+        args = ['reduction({}:{})'.format(k, ','.join(v)) for k, v in mapper.items()]
 
         return ' '.join(args)
 
@@ -213,9 +225,9 @@ class PragmaShmTransformer(ShmTransformer, PragmaSimdTransformer):
     IETs for CPUs.
     """
 
-    def __init__(self, sregistry, options, platform, compiler):
+    def __init__(self, **kwargs):
         key = lambda i: i.is_ParallelRelaxed and not i.is_Vectorized
-        super().__init__(key, sregistry, options, platform, compiler)
+        super().__init__(key, **kwargs)
 
     def _make_reductions(self, partree):
         if not any(i.is_ParallelAtomic for i in partree.collapsed):
@@ -238,8 +250,9 @@ class PragmaShmTransformer(ShmTransformer, PragmaSimdTransformer):
             # Implement reduction
             mapper = {partree.root: partree.root._rebuild(reduction=reductions)}
         elif all(i is OpInc for _, _, i in reductions):
-            # Use atomic increments
-            mapper = {i: i._rebuild(pragmas=self.langbb['atomic']) for i in exprs}
+            flag = (not self._support_complex_reduction(self.compiler) and
+                    any(np.iscomplexobj(i.dtype(0)) for i, _, _ in reductions))
+            mapper = {i: self.langbb['atomic'](i, flag) for i in exprs}
         else:
             raise NotImplementedError
 
@@ -255,18 +268,15 @@ class PragmaShmTransformer(ShmTransformer, PragmaSimdTransformer):
     def _make_partree(self, candidates, nthreads=None):
         assert candidates
 
-        # Get the collapsable Iterations
-        root, collapsable = self._select_candidates(candidates)
-        ncollapsed = 1 + len(collapsable)
+        # Get the collapsible Iterations
+        root, collapsible = self._select_candidates(candidates)
+        ncollapsed = 1 + len(collapsible)
 
         # Prepare to build a ParallelTree
         if all(i.is_Affine for i in candidates):
             bundles = FindNodes(ExpressionBundle).visit(root)
             sops = sum(i.ops for i in bundles)
-            if sops >= self.dynamic_work:
-                schedule = 'dynamic'
-            else:
-                schedule = 'static'
+            schedule = 'dynamic' if sops >= self.dynamic_work else 'static'
             if nthreads is None:
                 # pragma ... for ... schedule(..., 1)
                 nthreads = self.nthreads
@@ -291,7 +301,7 @@ class PragmaShmTransformer(ShmTransformer, PragmaSimdTransformer):
             body = self.HostIteration(ncollapsed=ncollapsed, chunk_size=chunk_size,
                                       **root.args)
 
-            niters = prod([root.symbolic_size] + [j.symbolic_size for j in collapsable])
+            niters = prod([root.symbolic_size] + [j.symbolic_size for j in collapsible])
             value = INT(Max(INT(niters / (nthreads*self.chunk_nonaffine)), 1))
             prefix = [Expression(DummyEq(chunk_size, value, dtype=np.int32))]
 
@@ -311,6 +321,9 @@ class PragmaShmTransformer(ShmTransformer, PragmaSimdTransformer):
         for n in FindNodes(Expression).visit(partree):
             i = n.write
             if not (i.is_Array or i.is_TempFunction):
+                continue
+            elif partree.dim in i.dimensions:
+                # Non-local Array (full iteration space): no need to vector-expand
                 continue
             elif i in parrays:
                 pi = parrays[i]
@@ -388,7 +401,7 @@ class PragmaShmTransformer(ShmTransformer, PragmaSimdTransformer):
                 continue
 
             # Ignore if already part of an asynchronous region of code
-            # (e.g., an Iteartion embedded within a SyncSpot defining an
+            # (e.g., an Iteration embedded within a SyncSpot defining an
             # asynchronous operation)
             if any(n in sync_mapper for n in candidates):
                 continue
@@ -419,7 +432,7 @@ class PragmaShmTransformer(ShmTransformer, PragmaSimdTransformer):
 
         return iet, {'includes': [self.langbb['header']]}
 
-    def make_parallel(self, graph):
+    def make_parallel(self, graph, **kwargs):
         return self._make_parallel(graph, sync_mapper=graph.sync_mapper)
 
 
@@ -458,16 +471,14 @@ class PragmaTransfer(Pragma, Transfer):
     def expr_symbols(self):
         retval = [self.function.indexed]
         for i in self.arguments + tuple(flatten(self.sections)):
-            try:
+            with suppress(AttributeError):
                 retval.extend(i.free_symbols)
-            except AttributeError:
-                pass
         return tuple(retval)
 
     @cached_property
     def _generate(self):
         # Stringify sections
-        sections = ''.join(['[%s:%s]' % (ccode(i), ccode(j))
+        sections = ''.join([f'[{ccode(i)}:{ccode(j)}]'
                             for i, j in self.sections])
         arguments = [ccode(i) for i in self.arguments]
         return self.pragma % (self.function.name, sections, *arguments)
@@ -480,20 +491,20 @@ class PragmaDeviceAwareTransformer(DeviceAwareMixin, PragmaShmTransformer):
     shared-memory-parallel, and device-parallel IETs.
     """
 
-    def __init__(self, sregistry, options, platform, compiler):
-        super().__init__(sregistry, options, platform, compiler)
+    def __init__(self, options=None, **kwargs):
+        super().__init__(options=options, **kwargs)
 
         self.gpu_fit = options['gpu-fit']
         # Need to reset the tile in case was already used and iter over by blocking
         self.par_tile = options['par-tile'].reset()
         self.par_disabled = options['par-disabled']
 
-    def _score_candidate(self, n0, root, collapsable=()):
+    def _score_candidate(self, n0, root, collapsible=()):
         # `ndptrs`, the number of device pointers, part of the score too to
         # ensure the outermost loop is offloaded
         ndptrs = len(self._device_pointers(root))
 
-        return (ndptrs,) + super()._score_candidate(n0, root, collapsable)
+        return (ndptrs,) + super()._score_candidate(n0, root, collapsible)
 
     def _make_threaded_prodders(self, partree):
         if isinstance(partree.root, self.DeviceIteration):
@@ -516,11 +527,11 @@ class PragmaDeviceAwareTransformer(DeviceAwareMixin, PragmaShmTransformer):
         """
         assert candidates
 
-        root, collapsable = self._select_candidates(candidates)
+        root, collapsible = self._select_candidates(candidates)
 
         if self._is_offloadable(root):
             body = self.DeviceIteration(gpu_fit=self.gpu_fit,
-                                        ncollapsed=len(collapsable)+1,
+                                        ncollapsed=len(collapsible)+1,
                                         tile=self.par_tile.nextitem(),
                                         **root.args)
             partree = ParallelTree([], body, nthreads=nthreads)

@@ -1,24 +1,23 @@
 import cloudpickle as pickle
-
-import pytest
 import numpy as np
-import sympy
+import pytest
 import scipy.sparse
+import sympy
 
-from conftest import assert_structure
-from devito import (Constant, Eq, Inc, Grid, Function, ConditionalDimension,
-                    Dimension, MatrixSparseTimeFunction, SparseTimeFunction,
-                    SubDimension, SubDomain, SubDomainSet, TimeFunction, exp,
-                    Operator, configuration, switchconfig, TensorTimeFunction,
-                    Buffer, assign)
-from devito.arch import get_gpu_info, get_cpu_info, Device, Cpu64
+from conftest import assert_structure, skipif
+from devito import (
+    Buffer, ConditionalDimension, Constant, Dimension, Eq, Function, Grid, Inc,
+    MatrixSparseTimeFunction, Operator, SparseTimeFunction, SubDimension, SubDomain,
+    SubDomainSet, TensorTimeFunction, TimeFunction, assign, configuration, exp,
+    switchconfig, switchenv
+)
+from devito.arch import Cpu64, Device, get_cpu_info, get_gpu_info
 from devito.exceptions import InvalidArgument
-from devito.ir import (Conditional, Expression, Section, FindNodes, FindSymbols,
-                       retrieve_iteration_tree)
+from devito.ir import (
+    Conditional, Expression, FindNodes, FindSymbols, Section, retrieve_iteration_tree
+)
 from devito.passes.iet.languages.openmp import OmpIteration
 from devito.types import DeviceID, DeviceRM, Lock, NPThreads, PThreadArray, Symbol
-
-from conftest import skipif
 
 pytestmark = skipif(['nodevice'], whole_module=True)
 
@@ -72,6 +71,108 @@ class TestGPUInfo:
             assert f.shape_allocated[1] == 32
         elif info['vendor'] == 'AMD':
             assert f.shape_allocated[1] == 64
+
+
+class TestDeviceID:
+    """
+    Test that device IDs and associated environment variables such as
+    CUDA_VISIBLE_DEVICES are correctly handled.
+    """
+
+    @pytest.mark.parametrize('env_variables', [{"CUDA_VISIBLE_DEVICES": "1"},
+                                               {"CUDA_VISIBLE_DEVICES": "1,2"},
+                                               {"CUDA_VISIBLE_DEVICES": "1,0"},
+                                               {"ROCR_VISIBLE_DEVICES": "1"},
+                                               {"HIP_VISIBLE_DEVICES": " 1"}])
+    def test_visible_devices(self, env_variables):
+        """
+        Test that physical device IDs used for querying memory on a device via
+        nvidia-smi correctly account for visible-device environment variables.
+        """
+        grid = Grid(shape=(10, 10))
+        u = Function(name='u', grid=grid)
+
+        eq = Eq(u, u+1)
+
+        with switchenv(env_variables):
+            op1 = Operator(eq)
+            argmap1 = op1.arguments()
+            # All variants in parameterisation should yield deviceid 1
+            assert argmap1._physical_deviceid == 1
+
+        # Check that physical deviceid is 0 when no environment variables set
+        op2 = Operator(eq)
+
+        argmap2 = op2.arguments()
+        # Default physical deviceid expected to be 0
+        assert argmap2._physical_deviceid == 0
+
+    @pytest.mark.parallel(mode=2)
+    @pytest.mark.parametrize('visible_devices', ["1,2", "1,0", "0,2,3"])
+    def test_visible_devices_mpi(self, visible_devices, mode):
+        """
+        Test that physical device IDs used for querying memory on a device via
+        nvidia-smi correctly account for visible-device environment variables
+        when using MPI.
+        """
+
+        grid = Grid(shape=(10, 10))
+        rank = grid.distributor.myrank
+        u = Function(name='u', grid=grid)
+
+        eq = Eq(u, u+1)
+
+        with switchenv({'CUDA_VISIBLE_DEVICES': visible_devices}):
+            op1 = Operator(eq)
+            argmap1 = op1.arguments()
+            devices = [int(i) for i in visible_devices.split(',')]
+            assert argmap1._physical_deviceid == devices[rank]
+
+        # In default case, physical deviceid will equal rank
+        op2 = Operator(eq)
+        argmap2 = op2.arguments()
+        assert argmap2._physical_deviceid == rank
+
+    def test_visible_devices_with_devito_deviceid(self):
+        """Test interaction between CUDA_VISIBLE_DEVICES and DEVITO_DEVICEID"""
+        grid = Grid(shape=(10, 10))
+        u = Function(name='u', grid=grid)
+
+        eq = Eq(u, u+1)
+
+        with switchenv({'CUDA_VISIBLE_DEVICES': "1,3"}), switchconfig(deviceid=1):
+            op = Operator(eq)
+
+            argmap = op.arguments()
+            # deviceid should see the world from within CUDA_VISIBLE_DEVICES
+            # So should be the second of the two visible devices specified (3)
+            assert argmap._physical_deviceid == 3
+
+        with switchenv({'CUDA_VISIBLE_DEVICES': "1"}), switchconfig(deviceid=0):
+            op1 = Operator(eq)
+
+            argmap1 = op1.arguments()
+            assert argmap1._physical_deviceid == 1
+
+    @pytest.mark.parallel(mode=2)
+    def test_deviceid_per_rank(self, mode):
+        """
+        Test that Device IDs set by the user on a per-rank basis do not
+        get modified.
+        """
+        # Reversed order to ensure it is different to default
+        user_set_deviceids = (1, 0)
+
+        grid = Grid(shape=(10, 10))
+        u = Function(name='u', grid=grid)
+
+        rank = grid.distributor.myrank
+        deviceid = user_set_deviceids[rank]
+
+        op = Operator(Eq(u, u+1))
+
+        argmap = op.arguments(deviceid=deviceid)
+        assert argmap._physical_deviceid == deviceid
 
 
 class TestCodeGeneration:
@@ -408,7 +509,7 @@ class TestStreaming:
         # a host Function
         piters = FindNodes(OmpIteration).visit(op)
         assert len(piters) == 1
-        assert type(piters.pop()) == OmpIteration
+        assert isinstance(piters.pop(), OmpIteration)
 
     def test_tasking_multi_output(self):
         nt = 10
@@ -1211,7 +1312,7 @@ class TestStreaming:
 
     def test_streaming_split_noleak(self):
         """
-        Make sure the helper pthreads leak no memory in the target langauge runtime.
+        Make sure the helper pthreads leak no memory in the target language runtime.
         """
         nt = 1000
         grid = Grid(shape=(20, 20, 20))

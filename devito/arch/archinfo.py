@@ -1,44 +1,49 @@
 """Collection of utilities to detect properties of the underlying architecture."""
 
-from functools import cached_property
-from subprocess import PIPE, Popen, DEVNULL, run
-from pathlib import Path
 import ctypes
-import re
-import os
-import sys
 import json
+import os
+import re
+import sys
+from contextlib import suppress
+from functools import cached_property
+from pathlib import Path
+from subprocess import DEVNULL, PIPE, CalledProcessError, Popen, run
 
 import cpuinfo
 import numpy as np
 import psutil
+from packaging.version import InvalidVersion, parse
 
 from devito.logger import warning
-from devito.tools import as_tuple, all_equal, memoized_func
+from devito.tools import all_equal, as_tuple, memoized_func
 
-__all__ = ['platform_registry', 'get_cpu_info', 'get_gpu_info', 'get_nvidia_cc',
-           'get_cuda_path', 'get_hip_path', 'check_cuda_runtime', 'get_m1_llvm_path',
-           'get_advisor_path', 'Platform', 'Cpu64', 'Intel64', 'IntelSkylake', 'Amd',
-           'Arm', 'Power', 'Device', 'NvidiaDevice', 'AmdDevice', 'IntelDevice',
-           # Brand-agnostic
-           'ANYCPU', 'ANYGPU',
-           # Intel CPUs
-           'INTEL64', 'SNB', 'IVB', 'HSW', 'BDW', 'KNL', 'KNL7210',
-           'SKX', 'KLX', 'CLX', 'CLK', 'SPR',
-           # AMD CPUs
-           'AMD',
-           # ARM CPUs
-           'ARM', 'AppleArm', 'M1', 'M2', 'M3',
-           'Graviton', 'GRAVITON2', 'GRAVITON3', 'GRAVITON4',
-           'Cortex', 'NvidiaArm', 'GRACE',
-           # Other legacy CPUs
-           'POWER8', 'POWER9',
-           # Generic GPUs
-           'AMDGPUX', 'NVIDIAX', 'INTELGPUX',
-           # Nvidia GPUs
-           'VOLTA', 'AMPERE', 'HOPPER', 'BLACKWELL',
-           # Intel GPUs
-           'PVC', 'INTELGPUMAX', 'MAX1100', 'MAX1550']
+__all__ = [  # noqa: RUF022
+    'platform_registry', 'get_cpu_info', 'get_gpu_info', 'get_visible_devices',
+    'get_nvidia_cc', 'get_cuda_path', 'get_cuda_version', 'get_hip_path',
+    'check_cuda_runtime', 'get_m1_llvm_path', 'get_advisor_path', 'Platform',
+    'Cpu64', 'Intel64', 'IntelSkylake', 'Amd', 'Arm', 'Power', 'Device',
+    'NvidiaDevice', 'AmdDevice', 'IntelDevice',
+    # Brand-agnostic
+    'ANYCPU', 'ANYGPU',
+    # Intel CPUs
+    'INTEL64', 'SNB', 'IVB', 'HSW', 'BDW', 'KNL', 'KNL7210',
+    'SKX', 'KLX', 'CLX', 'CLK', 'SPR',
+    # AMD CPUs
+    'AMD',
+    # ARM CPUs
+    'ARM', 'AppleArm', 'M1', 'M2', 'M3',
+    'Graviton', 'GRAVITON2', 'GRAVITON3', 'GRAVITON4',
+    'Cortex', 'NvidiaArm', 'GRACE',
+    # Other legacy CPUs
+    'POWER8', 'POWER9',
+    # Generic GPUs
+    'AMDGPUX', 'NVIDIAX', 'INTELGPUX',
+    # Nvidia GPUs
+    'VOLTA', 'AMPERE', 'HOPPER', 'BLACKWELL',
+    # Intel GPUs
+    'PVC', 'INTELGPUMAX', 'MAX1100', 'MAX1550'
+]
 
 
 @memoized_func
@@ -47,7 +52,7 @@ def get_cpu_info():
 
     # Obtain textual cpu info
     try:
-        with open('/proc/cpuinfo', 'r') as f:
+        with open('/proc/cpuinfo') as f:
             lines = f.readlines()
     except FileNotFoundError:
         lines = []
@@ -386,7 +391,7 @@ def get_gpu_info():
                     return None
                 return cbk
 
-            gpu_info['mem.%s' % i] = make_cbk(i)
+            gpu_info[f'mem.{i}'] = make_cbk(i)
 
         gpu_info['architecture'] = 'unspecified'
         gpu_info['vendor'] = 'INTEL'
@@ -488,6 +493,27 @@ def get_gpu_info():
     return None
 
 
+def get_visible_devices():
+    device_vars = (
+        'CUDA_VISIBLE_DEVICES',
+        'ROCR_VISIBLE_DEVICES',
+        'HIP_VISIBLE_DEVICES'
+    )
+    for v in device_vars:
+        try:
+            return v, tuple(int(i) for i in os.environ[v].split(','))
+        except ValueError:
+            # Visible devices set via UUIDs or other non-integer identifiers.
+            warning("Setting visible devices via UUIDs or other non-integer"
+                    " identifiers is currently unsupported: environment variable"
+                    f" {v}={os.environ[v]} ignored.")
+        except KeyError:
+            # Environment variable not set
+            continue
+
+    return None, None
+
+
 @memoized_func
 def get_nvidia_cc():
     libnames = ('libcuda.so', 'libcuda.dylib', 'cuda.dll')
@@ -532,6 +558,30 @@ def get_cuda_path():
 
 
 @memoized_func
+def get_cuda_version():
+    cuda_home = get_cuda_path()
+    if cuda_home is None:
+        nvc_version_command = ['nvcc', '--version']
+    else:
+        nvc_version_command = [f'{cuda_home}/bin/nvcc', '--version']
+
+    cuda_version = None
+    try:
+        out = run(nvc_version_command, capture_output=True, text=True)
+    except (FileNotFoundError, CalledProcessError):
+        pass
+    finally:
+        if out.returncode == 0:
+            start = out.stdout.find('release')
+            start = out.stdout.find(',', start) + 1
+            stop = out.stdout.find('\n', start)
+            with suppress(InvalidVersion):
+                cuda_version = parse(out.stdout[start:stop])
+
+    return cuda_version
+
+
+@memoized_func
 def get_advisor_path():
     """
     Detect if Intel Advisor is installed on the machine and return
@@ -555,7 +605,7 @@ def get_advisor_path():
 @memoized_func
 def get_hip_path():
     # *** First try: via commonly used environment variables
-    for i in ['HIP_HOME']:
+    for i in ['HIP_HOME', 'ROCM_HOME']:
         hip_home = os.environ.get(i)
         if hip_home:
             return hip_home
@@ -597,28 +647,36 @@ def get_m1_llvm_path(language):
 
 @memoized_func
 def check_cuda_runtime():
-    libnames = ('libcudart.so', 'libcudart.dylib', 'cudart.dll')
-    for libname in libnames:
-        try:
-            cuda = ctypes.CDLL(libname)
-        except OSError:
-            continue
-        else:
-            break
-    else:
+    libname = ctypes.util.find_library("cudart")
+    if not libname:
         warning("Unable to check compatibility of NVidia driver and runtime")
         return
 
+    cuda = ctypes.CDLL(libname)
     driver_version = ctypes.c_int()
     runtime_version = ctypes.c_int()
 
-    if cuda.cudaDriverGetVersion(ctypes.byref(driver_version)) == 0 and \
-       cuda.cudaRuntimeGetVersion(ctypes.byref(runtime_version)) == 0:
-        driver_version = driver_version.value
-        runtime_version = runtime_version.value
-        if driver_version < runtime_version:
-            warning("The NVidia driver (v%d) on this system may not be compatible "
-                    "with the CUDA runtime (v%d)" % (driver_version, runtime_version))
+    # Check the get*Version call succeeds and is a non-zero value
+    call_success = cuda.cudaDriverGetVersion(ctypes.byref(driver_version)) == 0
+    call_success &= cuda.cudaRuntimeGetVersion(ctypes.byref(runtime_version)) == 0
+    call_success &= bool(driver_version.value)
+
+    if call_success:
+        driver_v = parse(str(driver_version.value/1000))
+        runtime_v = parse(str(runtime_version.value/1000))
+        # First check the "major" version, known to be incompatible
+        if driver_v.major < runtime_v.major:
+            raise RuntimeError(
+                f'The NVidia driver (v{driver_version}) on this system is '
+                f'not compatible with the CUDA runtime (v{runtime_version})'
+            )
+        # Next check the version including minor revisions which may still
+        # be compatible
+        elif driver_v < runtime_v:
+            warning(
+                f'The NVidia driver (v{driver_version}) on this system may '
+                f'not be compatible with the CUDA runtime (v{runtime_version})'
+            )
     else:
         warning("Unable to check compatibility of NVidia driver and runtime")
 
@@ -674,9 +732,7 @@ def get_platform():
         elif 'intel' in brand:
             # Most likely a desktop i3/i5/i7
             return platform_registry['intel64']
-        elif 'power8' in brand:
-            return platform_registry['power8']
-        elif 'power9' in brand:
+        elif 'power8' in brand or 'power9' in brand:
             return platform_registry['power8']
         elif 'arm' in brand:
             return platform_registry['arm']
@@ -725,7 +781,7 @@ class Platform:
         return self.name
 
     def __repr__(self):
-        return "TargetPlatform[%s]" % self.name
+        return f'TargetPlatform[{self.name}]'
 
     def _detect_isa(self):
         return 'unknown'
@@ -935,6 +991,23 @@ class Power(Cpu64):
 
 class Device(Platform):
 
+    """
+    A generic Device is based on the SIMT (Single Instruction, Multiple Threads)
+    programming model. In this execution model, threads are batched together and
+    execute the same instruction at the same time, though each thread operates on
+    its own data. Intel, AMD, and Nvidia GPUs are all based on this model.
+    Unfortunately they use different terminology to refer to the same or at least
+    very similar concepts. Throughout Devito, whenever possible, we attempt to
+    adopt a neutral terminology -- the docstrings below provide some examples.
+    """
+
+    thread_group_size = None
+    """
+    A collection of threads that execute the same instruction in lockstep.
+    The group size is a hardware-specific property. For example, this is a
+    "warp" in NVidia GPUs and a "wavefront" in AMD GPUs.
+    """
+
     def __init__(self, name, cores_logical=None, cores_physical=None, isa='cpp',
                  max_threads_per_block=1024, max_threads_dimx=1024,
                  max_threads_dimy=1024, max_threads_dimz=64,
@@ -1017,6 +1090,8 @@ class IntelDevice(Device):
 
 class NvidiaDevice(Device):
 
+    thread_group_size = 32
+
     max_mem_trans_nbytes = 128
 
     @cached_property
@@ -1028,6 +1103,32 @@ class NvidiaDevice(Device):
                 return 'tesla'
         return None
 
+    @cached_property
+    def max_shm_per_block(self):
+        """
+        Get the maximum amount of shared memory per thread block
+        """
+        # Load libcudart
+        libname = ctypes.util.find_library("cudart")
+        if not libname:
+            return 64 * 1024  # 64 KB default
+        lib = ctypes.CDLL(libname)
+
+        cudaDevAttrMaxSharedMemoryPerBlockOptin = 97
+        # get current device
+        dev = ctypes.c_int()
+        lib.cudaGetDevice(ctypes.byref(dev))
+
+        # query attribute
+        value = ctypes.c_int()
+        lib.cudaDeviceGetAttribute(
+            ctypes.byref(value),
+            ctypes.c_int(cudaDevAttrMaxSharedMemoryPerBlockOptin),
+            dev
+        )
+
+        return value.value
+
     def supports(self, query, language=None):
         if language != 'cuda':
             return False
@@ -1038,10 +1139,10 @@ class NvidiaDevice(Device):
             warning(f"Couldn't establish if `query={query}` is supported on this "
                     "system. Assuming it is not.")
             return False
-        elif query == 'async-loads' and cc >= 80:
+        elif query == 'async-pipe' and cc >= 80:
             # Asynchronous pipeline loads -- introduced in Ampere
             return True
-        elif query in ('tma', 'thread-block-cluster') and cc >= 90:
+        elif query in ('tma', 'thread-block-cluster') and cc >= 90:  # noqa: SIM103
             # Tensor Memory Accelerator -- introduced in Hopper
             return True
         else:
@@ -1055,7 +1156,7 @@ class Volta(NvidiaDevice):
 class Ampere(Volta):
 
     def supports(self, query, language=None):
-        if query == 'async-loads':
+        if query == 'async-pipe':
             return True
         else:
             return super().supports(query, language)
@@ -1080,7 +1181,11 @@ class Blackwell(Hopper):
 
 class AmdDevice(Device):
 
+    thread_group_size = 64
+
     max_mem_trans_nbytes = 256
+
+    max_shm_per_block = 64*1024  # 64 KB
 
     @cached_property
     def march(cls):
@@ -1098,10 +1203,8 @@ class AmdDevice(Device):
         try:
             p1 = Popen(['offload-arch'], stdout=PIPE, stderr=PIPE)
         except OSError:
-            try:
+            with suppress(OSError):
                 p1 = Popen(['mygpu', '-d', fallback], stdout=PIPE, stderr=PIPE)
-            except OSError:
-                pass
             return fallback
 
         output, _ = p1.communicate()
@@ -1144,7 +1247,7 @@ def node_max_mem_trans_nbytes(platform):
     elif isinstance(platform, Device):
         return max(Cpu64.max_mem_trans_nbytes, mmtb0)
     else:
-        assert False, f"Unknown platform type: {type(platform)}"
+        raise AssertionError(f"Unknown platform type: {type(platform)}")
 
 
 # CPUs

@@ -1,25 +1,30 @@
 from ctypes import c_void_p
 
-import sympy
-import pytest
 import numpy as np
+import pytest
+import sympy
+from sympy import And, Expr, Number, Symbol, true
 
-from sympy import Expr, Number, Symbol
-from devito import (Constant, Dimension, Grid, Function, solve, TimeFunction, Eq,  # noqa
-                    Operator, SubDimension, norm, Le, Ge, Gt, Lt, Abs, sin, cos,
-                    Min, Max, Real, Imag, Conj, SubDomain, configuration)
-from devito.finite_differences.differentiable import SafeInv, Weights, Mul
-from devito.ir import Expression, FindNodes, ccode
-from devito.mpi.halo_scheme import HaloTouch
-from devito.symbolics import (
-    retrieve_functions, retrieve_indexed, evalrel, CallFromPointer, Cast, # noqa
-    DefFunction, FieldFromPointer, INT, FieldFromComposite, IntDiv, Namespace,
-    Rvalue, ReservedWord, ListInitializer, uxreplace, pow_to_mul,
-    retrieve_derivatives, BaseCast, SizeOf, VectorAccess
+from devito import (  # noqa
+    Abs, Conj, Constant, Dimension, Eq, Function, Ge, Grid, Gt, Imag, Le, Lt, Max, Min,
+    Operator, Real, SubDimension, SubDomain, TimeFunction, configuration, cos, norm, sin,
+    solve, switchconfig
 )
-from devito.tools import as_tuple, CustomDtype
-from devito.types import (Array, Bundle, FIndexed, LocalObject, Object,
-                          ComponentAccess, StencilDimension, Symbol as dSymbol)
+from devito.finite_differences.differentiable import Mul, SafeInv, Weights
+from devito.ir import Expression, FindNodes, ccode
+from devito.ir.support.guards import GuardExpr, pairwise_or, simplify_and
+from devito.mpi.halo_scheme import HaloTouch
+from devito.symbolics import (  # noqa
+    INT, BaseCast, CallFromPointer, Cast, DefFunction, FieldFromComposite,
+    FieldFromPointer, IntDiv, ListInitializer, Namespace, ReservedWord, RoundUp, Rvalue,
+    SizeOf, VectorAccess, evalrel, pow_to_mul, retrieve_derivatives, retrieve_functions,
+    retrieve_indexed, uxreplace
+)
+from devito.tools import CustomDtype, as_tuple
+from devito.types import (
+    Array, Bundle, ComponentAccess, FIndexed, LocalObject, Object, StencilDimension
+)
+from devito.types import Symbol as dSymbol
 from devito.types.basic import AbstractSymbol
 
 
@@ -53,8 +58,8 @@ def test_func_of_indices():
 
 
 @pytest.mark.parametrize('dtype,expected', [
-    (np.float32, "float r0 = 1.0F/h_x;"),
-    (np.float64, "double r0 = 1.0/h_x;")
+    (np.float32, "const float r0 = 1.0F/h_x;"),
+    (np.float64, "const double r0 = 1.0/h_x;")
 ])
 def test_floatification_issue_1627(dtype, expected):
     """
@@ -211,7 +216,7 @@ def test_bundle():
     fg = Bundle(name='fg', components=(f, g))
 
     # Test reconstruction
-    fg._rebuild().components == fg.components
+    assert fg._rebuild().components == fg.components
 
 
 def test_call_from_pointer():
@@ -374,6 +379,30 @@ def test_safeinv():
     assert 'SAFEINV' in str(op1)
     assert 'SAFEINV' in str(op2)
 
+    # Ensure .subs leaves the caller unchanged if no substitutions occur.
+    # We used to have a bug where passing SafeInv to .subs would result
+    # in the construction of weird, nonsensical objects due to the _subs
+    # stub in types.AbstractSymbol
+    f = Function(name='f', grid=grid)
+    ui = u1.indexify()
+    safeinv = SafeInv(ui, ui)
+    v = ui._subs(safeinv, f.indexify())
+    assert str(v) == 'u[x, y]'
+
+
+def test_roundup():
+    grid = Grid(shape=(11, 11))
+    u = Function(name='u', grid=grid)
+    a = dSymbol('a', dtype=np.int32)
+
+    expr = RoundUp(a, 16)
+    with switchconfig(platform='bdw', language='openmp'):
+        op = Operator(Eq(u, u + expr))
+
+    assert ccode(expr) == 'ROUND_UP(a, 16)'
+    assert '#define ROUND_UP(a,b)' in str(op)
+    assert 'ROUND_UP(a, 16)' in str(op)
+
 
 def test_def_function():
     foo0 = DefFunction('foo', arguments=['a', 'b'], template=['int'])
@@ -411,6 +440,31 @@ def test_namespace():
 
     # Free symbols
     assert not ns0.free_symbols
+
+
+def test_list_initializer():
+    # Legacy interface
+    init0 = ListInitializer((1, 2, 3))
+    assert str(init0) == '{1, 2, 3}'
+
+    init1 = ListInitializer(1, 2, 3)
+    assert str(init1) == '{1, 2, 3}'
+
+    # Test hashing and equality
+    assert init0 == init1
+    assert hash(init0) == hash(init1)
+    init2 = ListInitializer(1, 2)
+    assert init0 != init2
+    assert hash(init0) != hash(init2)
+    assert hash(init0) == hash(init1)
+
+    # Reconstruction
+    assert init0 == init0._rebuild()
+    assert init1 == init1._rebuild()
+    assert str(init1._rebuild(4, 5)) == '{4, 5}'
+
+    # Accept `evaluate` but gently ignore it
+    assert str(ListInitializer((1, 2), evaluate=True)) == '{1, 2}'
 
 
 def test_rvalue():
@@ -543,6 +597,160 @@ def test_halo_touch():
     assert hash(ht0) == hash(ht0._rebuild())
 
 
+def test_guard_expr_Le():
+    grid = Grid(shape=(3, 3, 3))
+    _, y, z = grid.dimensions
+
+    y_M = y.symbolic_max
+    z_M = z.symbolic_max
+
+    g0 = GuardExpr('g0', initvalue=And(y <= y_M + 3, z <= z_M + 3))
+    g1 = GuardExpr('g1', initvalue=And(y <= y_M + 3, z <= z_M + 4))
+
+    v0 = simplify_and(g0, g1)
+    v1 = simplify_and(g1, g0)
+    assert v0 is g0
+    assert v0 is v1
+
+    v2 = simplify_and(And(g0, g1), g0)
+    assert v2 is g0
+
+    g3 = GuardExpr('g3', initvalue=And(y <= y_M + 2, z <= z_M + 3))
+    v3 = simplify_and(g0, g3)
+    v4 = simplify_and(g3, g0)
+    assert v3 is g3
+    assert v4 is v3
+
+    g4 = GuardExpr('g4', initvalue=And(y <= y_M + 4, z <= z_M + 2))
+    v5 = simplify_and(g0, g4)
+    assert v5 == And(g0, g4)
+
+    g5 = GuardExpr('g5', initvalue=And(y <= y_M))
+    g6 = GuardExpr('g6', initvalue=And(z <= z_M))
+    v6 = simplify_and(g0, g5)
+    v7 = simplify_and(g0, g6)
+    v8 = simplify_and(g5, g6)
+    assert v6 == And(g0, g5)
+    assert v7 == And(g0, g6)
+    assert v8 == And(g5, g6)
+
+
+def test_guard_expr_Ge():
+    grid = Grid(shape=(3, 3, 3))
+    _, y, z = grid.dimensions
+
+    y_m = y.symbolic_min
+    z_m = z.symbolic_min
+
+    g0 = GuardExpr('g0', initvalue=And(y >= y_m - 3, z >= z_m - 3))
+    g1 = GuardExpr('g1', initvalue=And(y >= y_m - 3, z >= z_m - 4))
+    v0 = simplify_and(g0, g1)
+    v1 = simplify_and(g1, g0)
+    assert v0 is g0
+    assert v0 is v1
+
+    v2 = simplify_and(And(g0, g1), g0)
+    assert v2 is g0
+
+    g3 = GuardExpr('g3', initvalue=And(y >= y_m - 2, z >= z_m - 3))
+    v3 = simplify_and(g0, g3)
+    v4 = simplify_and(g3, g0)
+    assert v3 is g3
+    assert v4 is v3
+
+    g4 = GuardExpr('g4', initvalue=And(y >= y_m - 4, z >= z_m - 2))
+    v5 = simplify_and(g0, g4)
+    assert v5 == And(g0, g4)
+    g5 = GuardExpr('g5', initvalue=And(y >= y_m))
+    g6 = GuardExpr('g6', initvalue=And(z >= z_m))
+    v6 = simplify_and(g0, g5)
+    v7 = simplify_and(g0, g6)
+    v8 = simplify_and(g5, g6)
+    assert v6 == And(g0, g5)
+    assert v7 == And(g0, g6)
+    assert v8 == And(g5, g6)
+
+    g7 = GuardExpr('g7', initvalue=And(y >= -2, z >= -2))
+    v9 = simplify_and(g0, g7)
+    assert v9 == And(g0, g7)
+
+
+def test_guard_expr_Le_Ge_mixed():
+    grid = Grid(shape=(3, 3, 3))
+    _, y, z = grid.dimensions
+
+    y_m = y.symbolic_min
+    y_M = y.symbolic_max
+    z_m = z.symbolic_min
+    z_M = z.symbolic_max
+
+    g0 = GuardExpr('g0', initvalue=And(y <= y_M + 3, z <= z_M + 3))
+    g1 = GuardExpr('g1', initvalue=And(y >= y_m - 3, z >= z_m - 3))
+    v0 = simplify_and(g0, g1)
+    v1 = simplify_and(g1, g0)
+    assert v0 == And(g0, g1)
+    assert v1 == And(g0, g1)
+
+    g2 = GuardExpr('g2', initvalue=And(y <= y_M + 2, z >= z_m - 2))
+    v2 = simplify_and(g0, g2)
+    v3 = simplify_and(g2, g0)
+    assert v2 == And(g0, g2)
+    assert v3 == And(g0, g2)
+
+    g3 = GuardExpr('g3', initvalue=And(y >= y_m - 2, z <= z_M + 2))
+    v4 = simplify_and(g0, g3)
+    v5 = simplify_and(g3, g0)
+    assert v4 == And(g0, g3)
+    assert v5 == And(g0, g3)
+
+    g4 = GuardExpr('g4', initvalue=And(y <= y_M + 2, z >= z_m, z <= z_M + 2))
+    v6 = simplify_and(g0, g4)
+    v7 = simplify_and(g4, g0)
+    assert v6 is g4
+    assert v7 is g4
+
+    g5 = GuardExpr('g5', initvalue=And(y >= y_m - 2, y <= y_M + 2,
+                                       z >= z_m - 2, z <= z_M + 2))
+    v8 = simplify_and(g0, g5)
+    v9 = simplify_and(g5, g0)
+    assert v8 is g5
+    assert v9 is g5
+
+    g6 = GuardExpr('g6', initvalue=And(y >= y_m, y <= y_M,
+                                       z >= z_m - 3, z <= z_M))
+    v10 = simplify_and(g5, g6)
+    v11 = simplify_and(g6, g5)
+    assert v10 is And(g5, g6)
+    assert v11 is And(g5, g6)
+
+
+def test_guard_pairwise_or():
+    grid = Grid(shape=(3, 3, 3))
+    x, y, z = grid.dimensions
+
+    flag = GuardExpr('flag', initvalue=And(x >= 4, x <= 14))
+
+    g0 = And(flag, z >= 8, z <= 39)
+    g1 = And(z >= 8, z <= 40)
+    g2 = y >= 9
+    v0 = pairwise_or(g0, g1, g2)
+    assert v0 is true
+
+    g3 = And(z >= 7, z <= 40)
+    g4 = And(z >= 8, z <= 42, y >= 9)
+    v1 = pairwise_or(g0, g3, g4)
+    assert v1 == And(z >= 7, z <= 42)
+
+    # Some unsupported cases
+    g5 = And(flag, z >= 9, x >= 5)
+    g6 = x >= 3
+    with pytest.raises(NotImplementedError):
+        pairwise_or(g5, g6)
+    g7 = And(z <= y)
+    with pytest.raises(NotImplementedError):
+        pairwise_or(g0, g7)
+
+
 def test_canonical_ordering_of_weights():
     grid = Grid(shape=(3, 3, 3))
     x, y, z = grid.dimensions
@@ -555,11 +763,34 @@ def test_canonical_ordering_of_weights():
     fi = f[x, y + i, z]
     wi = w[i]
     cf = ComponentAccess(fi, 0)
+    safeinv = SafeInv(f, f)
 
     assert (ccode(1.0*f[x, y, z] + 2.0*f[x, y + 1, z] + 3.0*f[x, y + 2, z]) ==
             '1.0F*f[x][y][z] + 2.0F*f[x][y + 1][z] + 3.0F*f[x][y + 2][z]')
     assert ccode(fi*wi) == 'f[x][y + i0][z]*w0[i0]'
     assert ccode(cf*wi) == 'f[x][y + i0][z].x*w0[i0]'
+    assert ccode(safeinv*wi) == 'SAFEINV(f(x, y, z), f(x, y, z))*w0[i0]'
+
+    assert str(safeinv*wi) == 'SafeInv(f(x, y, z), f(x, y, z))*w0[i0]'
+
+
+def test_ideriv_subs_complex():
+    grid = Grid(shape=(3, 3))
+    x, _ = grid.dimensions
+
+    f = Function(name='f', grid=grid, space_order=4)
+    g = f.func(name='g')
+    h = f.func(name='h')
+    b = f.func(name='b')
+
+    ideriv = (f*g*h).dx._evaluate(expand=False)
+
+    i0, = ideriv.dimensions
+    base = ideriv.base
+
+    v = ideriv._subs(base, b._subs(x, x + i0))
+
+    assert str(v) == 'DiffDerivative(w(i0)*b(x + i0, y), (i0))'
 
 
 def test_symbolic_printing():
@@ -588,7 +819,7 @@ def test_is_on_grid():
     u = Function(name="u", grid=grid, space_order=2)
 
     assert u._grid_map == {}
-    assert u.subs({x: x0})._grid_map == {x: x0}
+    assert u.subs({x: x0})._grid_map == {x: x0, 'subs': {}}
     assert all(uu._grid_map == {} for uu in retrieve_functions(u.subs({x: x0}).evaluate))
 
 
@@ -689,7 +920,7 @@ class TestUxreplace:
 
         w_sub = uxreplace(w_lowered, {h_x: Number(3)})
 
-        assert np.isclose(w_sub, -0.003935689)
+        assert np.isclose(float(w_sub), -0.003935689)
         assert not w_sub.is_Mul
         assert w_sub.is_Number
 
@@ -862,7 +1093,7 @@ class TestRelationsWithAssumptions:
     ])
     def test_relations_w_complex_assumptions(self, op, expr, assumptions, expected):
         """
-        Tests evalmin/evalmax with multiple args and assumtpions"""
+        Tests evalmin/evalmax with multiple args and assumptions"""
         a = Symbol('a', positive=True)  # noqa
         b = Symbol('b', positive=True)  # noqa
         c = Symbol('c', positive=True)  # noqa
@@ -903,7 +1134,7 @@ class TestRelationsWithAssumptions:
     ])
     def test_relations_w_complex_assumptions_II(self, op, expr, assumptions, expected):
         """
-        Tests evalmin/evalmax with multiple args and assumtpions"""
+        Tests evalmin/evalmax with multiple args and assumptions"""
         a = Symbol('a', positive=False)  # noqa
         b = Symbol('b', positive=False)  # noqa
         c = Symbol('c', positive=True)  # noqa
@@ -922,7 +1153,7 @@ class TestRelationsWithAssumptions:
     ])
     def test_assumptions(self, op, expr, assumptions, expected):
         """
-        Tests evalmin/evalmax with multiple args and assumtpions"""
+        Tests evalmin/evalmax with multiple args and assumptions"""
         a = Symbol('a', positive=False)
         b = Symbol('b', positive=False)
         c = Symbol('c', positive=True)

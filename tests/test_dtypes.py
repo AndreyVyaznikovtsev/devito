@@ -2,17 +2,24 @@ import numpy as np
 import pytest
 import sympy
 
-from devito import (
-    Constant, Eq, Function, Grid, Operator, exp, log, sin, configuration
-)
+try:
+    from ..conftest import skipif
+except ImportError:
+    from conftest import skipif
+
+from devito import Constant, Eq, Function, Grid, Operator, configuration, exp, log, sin
+from devito.arch.compiler import CustomCompiler, GNUCompiler
+from devito.exceptions import InvalidOperator
 from devito.ir.cgen.printer import BasePrinter
 from devito.passes.iet.langbase import LangBB
 from devito.passes.iet.languages.C import CBB, CPrinter
 from devito.passes.iet.languages.openacc import AccBB, AccPrinter
 from devito.passes.iet.languages.openmp import OmpBB
 from devito.symbolics.extended_dtypes import ctypes_vector_mapper
+from devito.tools import dtype_to_cstr
 from devito.types.basic import Basic, Scalar, Symbol
 from devito.types.dense import TimeFunction
+from devito.types.sparse import SparseTimeFunction
 
 # Mappers for language-specific types and headers
 _languages: dict[str, type[LangBB]] = {
@@ -87,7 +94,7 @@ def test_dtype_mapping(dtype: np.dtype[np.inexact], kwargs: dict[str, str],
     # Check ctypes of the mapped parameters
     params: dict[str, Basic] = {p.name: p for p in op.parameters}
     _u, _c = params['u'], params['c']
-    assert type(_u.indexed._C_ctype._type_()) == ctypes_vector_mapper[dtype]
+    assert isinstance(_u.indexed._C_ctype._type_(), ctypes_vector_mapper[dtype])
     assert _c._C_ctype == expected or ctypes_vector_mapper[dtype]
 
 
@@ -118,7 +125,7 @@ def test_cse_ctypes(dtype: np.dtype[np.inexact], kwargs: dict[str, str]) -> None
 @pytest.mark.parametrize('dtype', [np.float32, np.complex64, np.complex128])
 @pytest.mark.parametrize('kwargs', _configs, ids=kw_id)
 def test_complex_headers(dtype: np.dtype[np.inexact], kwargs: dict[str, str]) -> None:
-    np.dtype
+    _ = np.dtype
     """
     Tests that the correct complex headers are included when complex dtypes
     are present in the operator, and omitted otherwise.
@@ -153,10 +160,7 @@ def test_imag_unit(dtype: np.complexfloating, kwargs: dict[str, str]) -> None:
         unit_str = '_Complex_I'
     else:
         # C++ provides imaginary literals
-        if dtype == np.complex64:
-            unit_str = '1if'
-        else:
-            unit_str = '1i'
+        unit_str = '1if' if dtype == np.complex64 else '1i'
 
     # Set up an operator
     s = Symbol(name='s', dtype=dtype)
@@ -184,10 +188,10 @@ def test_math_functions(dtype: np.dtype[np.inexact],
     if 'CXX' not in configuration['language']:
         if np.issubdtype(dtype, np.complexfloating):
             # Complex functions have a 'c' prefix
-            call_str = 'c%s' % call_str
+            call_str = f'c{call_str}'
         if dtype(0).real.itemsize <= 4:
             # Single precision have an 'f' suffix (half is promoted to single)
-            call_str = '%sf' % call_str
+            call_str = f'{call_str}f'
 
     # Operator setup
     a = Symbol(name='a', dtype=dtype)
@@ -274,3 +278,57 @@ def test_complex_space_deriv(dtype: np.dtype[np.complexfloating]) -> None:
     dfdy = h.data.T[1:-1, 1:-1]
     assert np.allclose(dfdx, np.ones((5, 5), dtype=dtype))
     assert np.allclose(dfdy, np.ones((5, 5), dtype=dtype))
+
+
+@skipif(['noomp', 'device'])
+@pytest.mark.parametrize('dtypeu', [np.float32, np.complex64, np.complex128])
+def test_complex_reduction(dtypeu: np.dtype[np.complexfloating]) -> None:
+    """
+    Tests reductions over complex-valued functions.
+    """
+    grid = Grid((11, 11))
+
+    u = TimeFunction(name="u", grid=grid, space_order=2, time_order=1, dtype=dtypeu)
+    for dtypes in [dtypeu, dtypeu(0).real.__class__]:
+        u.data.fill(0)
+        s = SparseTimeFunction(name="s", grid=grid, npoint=1, nt=10, dtype=dtypes)
+        if np.issubdtype(dtypes, np.complexfloating):
+            s.data[:] = 1 + 2j
+            expected = 8. + 16.j
+        else:
+            s.data[:] = 1
+            expected = 8.
+        s.coordinates.data[:] = [.5, .5]
+
+        # s complex and u real should error
+        if np.issubdtype(dtypeu, np.floating) and \
+           np.issubdtype(dtypes, np.complexfloating):
+            with pytest.raises(InvalidOperator):
+                op = Operator([Eq(u.forward, u)] + s.inject(u.forward, expr=s))
+            continue
+        else:
+            op = Operator([Eq(u.forward, u)] + s.inject(u.forward, expr=s))
+        op()
+
+        if op._options['linearize']:
+            ustr = 'uL0(t1, rsx + posx + 2, rsy + posy + 2)'
+        else:
+            ustr = 'u[t1][rsx + posx + 2][rsy + posy + 2]'
+
+        compiler = configuration['compiler']
+        gnu = isinstance(compiler, GNUCompiler) or \
+            (isinstance(compiler, CustomCompiler) and compiler._base is GNUCompiler)
+        if gnu and np.issubdtype(dtypeu, np.complexfloating):
+            if 'CXX' in op._language:
+                rd = dtype_to_cstr(dtypeu(0).real.__class__)
+                fu = f'reinterpret_cast<{rd}*>(&{ustr})'
+                assert f'{fu}[0] += std::real(r0)' in str(op)
+                assert f'{fu}[1] += std::imag(r0)' in str(op)
+            else:
+                ext = '' if dtypeu == np.complex128 else 'f'
+                assert f'__real__ {ustr} += creal{ext}(r0)' in str(op)
+                assert f'__imag__ {ustr} += cimag{ext}(r0)' in str(op)
+        else:
+            assert f'{ustr} += r0' in str(op)
+
+        assert np.isclose(u.data[0, 5, 5], expected)

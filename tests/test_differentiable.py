@@ -1,11 +1,13 @@
 from itertools import product
 
-import sympy
+import numpy as np
 import pytest
+import sympy
 
-from devito import Function, Grid, Differentiable, NODE
-from devito.finite_differences.differentiable import (Add, Mul, Pow, diffify,
-                                                      interp_for_fd, SafeInv)
+from devito import NODE, Differentiable, Function, Grid
+from devito.finite_differences.differentiable import (
+    Add, Mul, Pow, SafeInv, diffify, interp_for_fd
+)
 
 
 def test_differentiable():
@@ -56,7 +58,7 @@ def test_shift():
     assert a.shift(x, x.spacing).shift(x, -x.spacing) == a
     assert a.shift(x, x.spacing).shift(x, x.spacing) == a.shift(x, 2*x.spacing)
     assert a.dx.evaluate.shift(x, x.spacing) == a.shift(x, x.spacing).dx.evaluate
-    assert a.shift(x, .5 * x.spacing)._grid_map == {x: x + .5 * x.spacing}
+    assert a.shift(x, .5 * x.spacing)._grid_map == {x: x + .5 * x.spacing, 'subs': {}}
 
 
 def test_interp():
@@ -96,28 +98,70 @@ def test_interp():
 
 
 @pytest.mark.parametrize('ndim', [1, 2, 3])
-def test_avg_mode(ndim):
+@pytest.mark.parametrize('io', [None, 2, 4])
+def test_avg_mode(ndim, io):
     grid = Grid([11]*ndim)
-    v = Function(name='v', grid=grid, staggered=grid.dimensions)
-    a0 = Function(name="a0", grid=grid)
-    a = Function(name="a", grid=grid, parameter=True)
-    b = Function(name="b", grid=grid, parameter=True, avg_mode='harmonic')
+    v = Function(name='v', grid=grid, staggered=grid.dimensions, space_order=4)
+    kw = {'space_order': 4}
+    if io is not None:
+        kw['interp_order'] = io
+    else:
+        io = 2  # Default value
+
+    with pytest.raises(ValueError):
+        # interp_order > space_order
+        Function(name="a", grid=grid, interp_order=8, space_order=4)
+    with pytest.raises(TypeError):
+        # interp_order not int
+        Function(name="a", grid=grid, interp_order=2.5, space_order=4)
+
+    a0 = Function(name="a0", grid=grid, **kw)
+    a = Function(name="a", grid=grid, **kw)
+    b = Function(name="b", grid=grid, avg_mode='safe_harmonic', **kw)
 
     a0_avg = a0._eval_at(v)
-    a_avg = a._eval_at(v).evaluate
-    b_avg = b._eval_at(v).evaluate
+    a_avg = a._eval_at(v).evaluate.simplify()
+    b_avg = b._eval_at(v).evaluate.simplify()
 
-    assert a0_avg == a0
+    assert a0_avg == a0.subs(v.indices_ref.getters)
 
     # Indices around the point at the center of a cell
-    all_shift = tuple(product(*[[0, 1] for _ in range(ndim)]))
-    args = [{d: d + i * d.spacing for d, i in zip(grid.dimensions, s)} for s in all_shift]
+    idx = list(range(-io//2 + 1, io//2 + 1))
+    all_shift = tuple(product(*[idx for _ in range(ndim)]))
+    coeffs = {2: [0.5, 0.5], 4: [-1/16, 9/16, 9/16, -1/16]}[io]
+    vars = ['i', 'j', 'k'][:ndim]
+    rule = ','.join(vars) + '->' + ''.join(vars)
+    ndcoeffs = np.einsum(rule, *([coeffs]*ndim))
+    args = [
+        {d: d + i * d.spacing for d, i in zip(grid.dimensions, s, strict=True)}
+        for s in all_shift
+    ]
 
     # Default is arithmetic average
-    assert sympy.simplify(a_avg - 0.5**ndim * sum(a.subs(arg) for arg in args)) == 0
+    expected = sum(
+        c * a.subs(arg) for c, arg in zip(ndcoeffs.flatten(), args, strict=True)
+    )
+    assert sympy.simplify(a_avg - expected) == 0
 
     # Harmonic average, h(a[.5]) = 1/(.5/a[0] + .5/a[1])
-    expected = 1/(0.5**ndim * sum(1/b.subs(arg) for arg in args))
-    assert sympy.simplify(1/b_avg.args[0] - expected) == 0
+    expected = (sum(c * SafeInv(b.subs(arg), b.subs(arg))
+                    for c, arg in zip(ndcoeffs.flatten(), args, strict=True)))
+    assert sympy.simplify(b_avg.args[0] - expected) == 0
     assert isinstance(b_avg, SafeInv)
     assert b_avg.base == b
+
+
+def test_no_interp():
+    grid = Grid((10, 10))
+    x = grid.dimensions[0]
+    a = Function(name="a", grid=grid, staggered=NODE, interp_order=0)
+    sa = Function(name="as", grid=grid, staggered=x)
+
+    assert a._eval_at(sa) == a
+    assert sa._eval_at(a) == sa._subs(x, x - x.spacing/2)
+    assert (a*sa)._eval_at(sa) == a*sa
+    assert (a + sa)._eval_at(sa) == a + sa
+
+    a_shift = a._subs(x, x + x.spacing / 2)
+    # Should just do nearest grid point, so shift back to original
+    assert a_shift.evaluate == a

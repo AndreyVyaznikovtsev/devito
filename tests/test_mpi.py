@@ -1,27 +1,28 @@
-import numpy as np
-import pytest
 from functools import cached_property
 
-from conftest import _R, assert_blocking, assert_structure
-from devito import (Grid, Constant, Function, TimeFunction, SparseFunction,
-                    SparseTimeFunction, VectorTimeFunction, TensorTimeFunction,
-                    Dimension, ConditionalDimension, div, solve, diag, grad,
-                    SubDimension, SubDomain, Eq, Ne, Inc, NODE, Operator, norm,
-                    inner, configuration, switchconfig, generic_derivative,
-                    PrecomputedSparseFunction, DefaultDimension, Buffer,
-                    CustomDimension)
+import numpy as np
+import pytest
+from test_dse import TestTTI
+
+from conftest import _R, assert_blocking, assert_structure, body0
+from devito import (
+    NODE, Buffer, ConditionalDimension, Constant, CustomDimension, DefaultDimension,
+    Dimension, Eq, Function, Grid, Inc, Ne, Operator, PrecomputedSparseFunction,
+    SparseFunction, SparseTimeFunction, SubDimension, SubDomain, TensorTimeFunction,
+    TimeFunction, VectorTimeFunction, configuration, diag, div, generic_derivative, grad,
+    inner, norm, solve, switchconfig
+)
 from devito.arch.compiler import OneapiCompiler
 from devito.data import LEFT, RIGHT
-from devito.ir.iet import (Call, Conditional, Iteration, FindNodes, FindSymbols,
-                           retrieve_iteration_tree)
+from devito.ir.iet import (
+    Call, Conditional, FindNodes, FindSymbols, Iteration, retrieve_iteration_tree
+)
+from devito.ir.support.space import Backward, Forward
 from devito.mpi import MPI
-from devito.mpi.routines import (HaloUpdateCall, HaloUpdateList, MPICall,
-                                 ComputeCall)
 from devito.mpi.distributed import CustomTopology
+from devito.mpi.routines import ComputeCall, HaloUpdateCall, HaloUpdateList, MPICall
 from devito.tools import Bunch
-
 from examples.seismic.acoustic import acoustic_setup
-from test_dse import TestTTI
 
 
 class TestDistributor:
@@ -161,7 +162,9 @@ class TestDistributor:
                 (0, 1, PN, 2, 3, PN, PN, PN, PN)]
         }
 
-        mapper = dict(zip(attrs, expected[distributor.nprocs][distributor.myrank]))
+        mapper = dict(zip(
+            attrs, expected[distributor.nprocs][distributor.myrank], strict=True
+        ))
         obj = distributor._obj_neighborhood
         value = obj._arg_defaults()[obj.name]
         assert all(getattr(value._obj, k) == v for k, v in mapper.items())
@@ -351,8 +354,13 @@ class TestSubDistributor:
         md = MyDomain(grid=grid)
         d = md.distributor
 
-        for dec, pdec, sdi, sh in zip(d.decomposition, d.parent.decomposition,
-                                      d.subdomain_interval, grid.shape):
+        for dec, pdec, sdi, sh in zip(
+            d.decomposition,
+            d.parent.decomposition,
+            d.subdomain_interval,
+            grid.shape,
+            strict=True
+        ):
             # Get the global min and max
             lower_bounds = [np.amin(i) for i in dec if i.size != 0]
             upper_bounds = [np.amax(i) for i in dec if i.size != 0]
@@ -572,8 +580,14 @@ class TestFunction:
         grid = Grid(shape=shape)
         f = Function(name='f', grid=grid)
 
-        assert all(i == slice(*j)
-                   for i, j in zip(f.local_indices, expected[grid.distributor.myrank]))
+        assert all(
+            i == slice(*j)
+            for i, j in zip(
+                f.local_indices,
+                expected[grid.distributor.myrank],
+                strict=True
+            )
+        )
 
     @pytest.mark.parallel(mode=4)
     @pytest.mark.parametrize('shape', [(1,), (2, 3), (4, 5, 6)])
@@ -1492,7 +1506,7 @@ class TestCodeGeneration:
         eqns += [Eq(U.forward, U.dx + u.forward)]
 
         op = Operator(eqns)
-        op.cfunction
+        _ = op.cfunction
 
         check_halo_exchanges(op, 2, 2)
 
@@ -1515,7 +1529,7 @@ class TestCodeGeneration:
         op = Operator(eqns)
 
         assert len(FindNodes(HaloUpdateCall).visit(op)) == 1
-        op.cfunction
+        _ = op.cfunction
 
     @pytest.mark.parallel(mode=2)
     def test_merge_and_hoist_haloupdate_if_diff_locindices(self, mode):
@@ -1537,7 +1551,7 @@ class TestCodeGeneration:
 
         In the IET we end up with *two* HaloSpots, one placed before the
         time loop, and one placed before the second Eq. The third Eq,
-        reading from f[t0], will seamlessy find its halo up-to-date,
+        reading from f[t0], will seamlessly find its halo up-to-date,
         due to the f[t1] being updated in the previous time iteration.
         """
         grid = Grid(shape=(10,))
@@ -1564,9 +1578,9 @@ class TestCodeGeneration:
         assert len(calls) == 2
         assert calls[0].arguments[3].args[0] is t.symbolic_min
 
-        assert len(FindNodes(HaloUpdateCall).visit(op.body.body[1].body[0])) == 1
-        assert len(FindNodes(HaloUpdateCall).visit(op.body.body[1].body[1])) == 1
-        assert len(FindNodes(HaloUpdateCall).visit(op.body.body[1].body[2])) == 0
+        assert len(FindNodes(HaloUpdateCall).visit(body0(op).body[0])) == 1
+        assert len(FindNodes(HaloUpdateCall).visit(body0(op).body[1])) == 1
+        assert len(FindNodes(HaloUpdateCall).visit(body0(op).body[2])) == 0
 
         op.apply(time_M=1)
 
@@ -1595,7 +1609,7 @@ class TestCodeGeneration:
                 rec.interpolate(expr=v1)]
 
         op = Operator(eqns)
-        op.cfunction
+        _ = op.cfunction
 
         calls, _ = check_halo_exchanges(op, 2, 2)
         for i, v in enumerate([v2, v1]):
@@ -1788,7 +1802,7 @@ class TestCodeGeneration:
 
         op = Operator(eqns)
 
-        op.cfunction
+        _ = op.cfunction
 
         calls = FindNodes(Call).visit(op)
 
@@ -1828,7 +1842,7 @@ class TestCodeGeneration:
 
         op = Operator(eqns)
 
-        op.cfunction
+        _ = op.cfunction
 
         calls = FindNodes(Call).visit(op)
         assert len(calls) == 2
@@ -1874,10 +1888,12 @@ class TestCodeGeneration:
     @pytest.mark.parallel(mode=1)
     def test_haloupdate_buffer1(self, mode):
         grid = Grid(shape=(4, 4))
-        x, y = grid.dimensions
 
-        u = TimeFunction(name='u', grid=grid, time_order=1, save=Buffer(1))
-        v = TimeFunction(name='v', grid=grid, time_order=1, save=Buffer(1))
+        # With order 2 (1) forward derivatives, the loops can (and will) be fused,
+        # removing the need for a halo update so space_order=4 is used to ensure
+        # derivatives are centred resulting in parallel loops and halo updates
+        u = TimeFunction(name='u', grid=grid, time_order=1, space_order=4, save=Buffer(1))
+        v = TimeFunction(name='v', grid=grid, time_order=1, space_order=4, save=Buffer(1))
 
         eqns = [Eq(u.forward, div(v) + 1.),
                 Eq(v.forward, div(u.forward) + 1.)]
@@ -1896,22 +1912,22 @@ class TestCodeGeneration:
     @pytest.mark.parallel(mode=1)
     @pytest.mark.parametrize('sz,fwd,expr,exp0,exp1,args', [
         (1, True, 'rec.interpolate(v2)', 3, 2, ('v1', 'v2')),
-        (1, True, 'Eq(v3.forward, v2.laplace + 1)', 1, 1, ('v2',)),
-        (1, True, 'Eq(v3.forward, v2.forward.laplace + 1)', 3, 2, ('v1', 'v2',)),
-        (2, True, 'Eq(v3.forward, v2.forward.laplace + 1)', 3, 2, ('v1', 'v2',)),
+        (1, True, 'Eq(v3.forward, v2.laplace + 1)', 3, 2, ('v1', 'v2')),
+        (1, True, 'Eq(v3.forward, v2.forward.laplace + 1)', 3, 2, ('v1', 'v2')),
+        (2, True, 'Eq(v3.forward, v2.forward.laplace + 1)', 3, 2, ('v1', 'v2')),
         (1, False, 'rec.interpolate(v2)', 3, 2, ('v1', 'v2')),
-        (1, False, 'Eq(v3.backward, v2.laplace + 1)', 1, 1, ('v2',)),
-        (1, False, 'Eq(v3.backward, v2.backward.laplace + 1)', 3, 2, ('v1', 'v2',)),
-        (2, False, 'Eq(v3.backward, v2.backward.laplace + 1)', 3, 2, ('v1', 'v2',)),
+        (1, False, 'Eq(v3.backward, v2.laplace + 1)', 3, 2, ('v1', 'v2')),
+        (1, False, 'Eq(v3.backward, v2.backward.laplace + 1)', 3, 2, ('v1', 'v2')),
+        (2, False, 'Eq(v3.backward, v2.backward.laplace + 1)', 3, 2, ('v1', 'v2')),
     ])
     def test_haloupdate_buffer_cases(self, sz, fwd, expr, exp0, exp1, args, mode):
         grid = Grid((65, 65, 65), topology=('*', 1, '*'))
 
-        v1 = TimeFunction(name='v1', grid=grid, space_order=2, time_order=1,
+        v1 = TimeFunction(name='v1', grid=grid, space_order=4, time_order=1,
                           save=Buffer(1))
-        v2 = TimeFunction(name='v2', grid=grid, space_order=2, time_order=1,
+        v2 = TimeFunction(name='v2', grid=grid, space_order=4, time_order=1,
                           save=Buffer(1))
-        v3 = TimeFunction(name='v3', grid=grid, space_order=2, time_order=1,  # noqa
+        v3 = TimeFunction(name='v3', grid=grid, space_order=4, time_order=1,  # noqa
                           save=Buffer(1))
 
         rec = SparseTimeFunction(name='rec', grid=grid, nt=500, npoint=65)  # noqa
@@ -1926,7 +1942,13 @@ class TestCodeGeneration:
                     eval(expr)]
 
         op = Operator(eqns)
-        op.cfunction
+        _ = op.cfunction
+
+        # Check for time loop direction
+        trees = retrieve_iteration_tree(op)
+        direction = Forward if fwd else Backward
+        for tree in trees:
+            assert tree[0].direction == direction
 
         calls, _ = check_halo_exchanges(op, exp0, exp1)
         for i, v in enumerate(args):
@@ -1948,7 +1970,7 @@ class TestCodeGeneration:
                 Eq(v3, v2.laplace + v1)]
 
         op = Operator(eqns)
-        op.cfunction
+        _ = op.cfunction
 
         calls, _ = check_halo_exchanges(op, 3, 2)
         # More specifically, we ensure HaloSpot(v2) is on the last loop nest
@@ -1969,7 +1991,7 @@ class TestCodeGeneration:
                 rec.interpolate(expr=v1.forward)]
 
         op = Operator(eqns)
-        op.cfunction
+        _ = op.cfunction
 
         calls, _ = check_halo_exchanges(op, 3, 2)
         assert calls[0].arguments[0] is v2
@@ -2005,7 +2027,7 @@ class TestCodeGeneration:
         eq1 = Eq(f.backward, f.laplace + .002)
 
         op1 = Operator(rec + [eq1])
-        op1.cfunction
+        _ = op1.cfunction
 
         check_halo_exchanges(op1, 1, 1)
 
@@ -2158,6 +2180,28 @@ class TestCodeGeneration:
         expected = [nx * ny * max(t-1, 0) for t in range(0, nt, 2)]
         assert np.allclose(g.data, expected)
         assert np.allclose(h.data, expected)
+
+    @pytest.mark.parallel(mode=1)
+    def test_lift_halo_update_outside_distributed(self, mode):
+        grid = Grid(shape=(28, 28, 28))
+        x, _, _ = grid.dimensions
+        h_x = x.spacing
+
+        vx = TimeFunction(name="vx", grid=grid, space_order=4, time_order=1)
+        vy = TimeFunction(name="vy", grid=grid, space_order=4, time_order=1)
+        vz = TimeFunction(name="vz", grid=grid, space_order=4, time_order=1)
+
+        eqn = Eq(vz, vz.dy + vz.dx(x0=x - 5.*h_x) + (vx.dy + vy.dx).dx.dy + vz)
+
+        # Ensure the Operator can be constructed and jit-compiled correctly
+        op = Operator(eqn)
+        _ = op.cfunction
+
+        # Check generated code -- expected one halo exchange exactly at the top
+        # of the time loop
+        tloop = get_time_loop(op)
+        halo_update = tloop.nodes[0].body[0].body[0].body[0]
+        assert isinstance(halo_update, HaloUpdateList)
 
 
 class TestOperatorAdvanced:
@@ -2535,9 +2579,9 @@ class TestOperatorAdvanced:
         t = grid.stepping_dim
 
         # SubDimensions to implement BCs
-        xl, yl = [SubDimension.left('%sl' % d.name, d, tkn) for d in [x, y]]
-        xi, yi = [SubDimension.middle('%si' % d.name, d, tkn, tkn) for d in [x, y]]
-        xr, yr = [SubDimension.right('%sr' % d.name, d, tkn) for d in [x, y]]
+        xl, yl = [SubDimension.left(f'{d.name}l', d, tkn) for d in [x, y]]
+        xi, yi = [SubDimension.middle(f'{d.name}i', d, tkn, tkn) for d in [x, y]]
+        xr, yr = [SubDimension.right(f'{d.name}r', d, tkn) for d in [x, y]]
 
         # Functions
         u = TimeFunction(name='f', grid=grid)
@@ -2570,7 +2614,7 @@ class TestOperatorAdvanced:
         # 0 0 4 4 4 4 4 0 0
         # 0 0 5 5 5 5 5 0 0
 
-        assert np.all(u.data_ro_domain[0] == 0)  # The write occures at t=1
+        assert np.all(u.data_ro_domain[0] == 0)  # The write occurs at t=1
 
         glb_pos_map = u.grid.distributor.glb_pos_map
         # Check cornes
@@ -3121,7 +3165,7 @@ class TestOperatorAdvanced:
 
         op = Operator(eqns)
 
-        op.cfunction
+        _ = op.cfunction
 
         calls, _ = check_halo_exchanges(op, 2, 1)
         args = calls[0].arguments
@@ -3135,7 +3179,7 @@ def gen_serial_norms(shape, so):
     """
     day = np.datetime64('today')
     try:
-        l = np.load("norms%s.npy" % len(shape), allow_pickle=True)
+        l = np.load(f"norms{len(shape)}.npy", allow_pickle=True)
         assert l[-1] == day
     except:
         tn = 500.  # Final time
@@ -3155,7 +3199,7 @@ def gen_serial_norms(shape, so):
         Ev = norm(v)
         Esrca = norm(srca)
 
-        np.save("norms%s.npy" % len(shape), (Eu, Erec, Ev, Esrca, day), allow_pickle=True)
+        np.save(f"norms{len(shape)}.npy", (Eu, Erec, Ev, Esrca, day), allow_pickle=True)
 
 
 class TestIsotropicAcoustic:
@@ -3274,15 +3318,15 @@ class TestElasticLike:
         u_t = Eq(tau.forward, damp * solve(pde_tau, tau.forward))
 
         op = Operator([u_v] + [u_t] + rec_term)
-        op.cfunction
+        _ = op.cfunction
 
         assert len(op._func_table) == 11
 
         calls = [i for i in FindNodes(Call).visit(op) if isinstance(i, HaloUpdateCall)]
         assert len(calls) == 5
-        assert len(FindNodes(HaloUpdateCall).visit(op.body.body[1].body[1].body[0])) == 1
-        assert len(FindNodes(HaloUpdateCall).visit(op.body.body[1].body[1].body[1])) == 4
-        assert len(FindNodes(HaloUpdateCall).visit(op.body.body[1].body[1].body[2])) == 0
+        assert len(FindNodes(HaloUpdateCall).visit(body0(op).body[1].body[0])) == 1
+        assert len(FindNodes(HaloUpdateCall).visit(body0(op).body[1].body[1])) == 4
+        assert len(FindNodes(HaloUpdateCall).visit(body0(op).body[1].body[2])) == 0
 
         assert calls[0].arguments[0] is v[0]
         assert calls[0].arguments[1] is v[1]
@@ -3331,8 +3375,8 @@ class TestElasticLike:
         calls = [i for i in FindNodes(Call).visit(op0) if isinstance(i, HaloUpdateCall)]
 
         assert len(calls) == 3
-        assert len(FindNodes(HaloUpdateCall).visit(op0.body.body[1].body[1].body[0])) == 1
-        assert len(FindNodes(HaloUpdateCall).visit(op0.body.body[1].body[1].body[1])) == 2
+        assert len(FindNodes(HaloUpdateCall).visit(body0(op0).body[1].body[0])) == 1
+        assert len(FindNodes(HaloUpdateCall).visit(body0(op0).body[1].body[1])) == 2
         assert calls[0].arguments[0] is v
         assert calls[1].arguments[0] is tau
         assert calls[2].arguments[0] is v
@@ -3344,7 +3388,7 @@ class TestElasticLike:
         rec_term1 = rec.interpolate(expr=v.forward)
 
         op1 = Operator([u_v, u_tau, rec_term1])
-        op1.cfunction
+        _ = op1.cfunction
 
         calls, _ = check_halo_exchanges(op1, 2, 2)
         assert calls[0].arguments[0] is tau
@@ -3375,8 +3419,8 @@ class TestElasticLike:
         calls = [i for i in FindNodes(Call).visit(op2) if isinstance(i, HaloUpdateCall)]
 
         assert len(calls) == 5
-        assert len(FindNodes(HaloUpdateCall).visit(op2.body.body[1].body[1].body[0])) == 2
-        assert len(FindNodes(HaloUpdateCall).visit(op2.body.body[1].body[1].body[1])) == 3
+        assert len(FindNodes(HaloUpdateCall).visit(body0(op2).body[1].body[0])) == 2
+        assert len(FindNodes(HaloUpdateCall).visit(body0(op2).body[1].body[1])) == 3
         assert calls[0].arguments[0] is v
         assert calls[1].arguments[0] is v2
         assert calls[2].arguments[0] is tau
@@ -3405,13 +3449,13 @@ class TestElasticLike:
         rec_term3 = rec2.interpolate(expr=v2.forward)
 
         op3 = Operator([u_v, u_v2, u_tau, u_tau2, rec_term0, rec_term3])
-        op3.cfunction
+        _ = op3.cfunction
 
         calls = [i for i in FindNodes(Call).visit(op3) if isinstance(i, HaloUpdateCall)]
 
         assert len(calls) == 4
-        assert len(FindNodes(HaloUpdateCall).visit(op3.body.body[1].body[1].body[0])) == 1
-        assert len(FindNodes(HaloUpdateCall).visit(op3.body.body[1].body[1].body[1])) == 3
+        assert len(FindNodes(HaloUpdateCall).visit(body0(op3).body[1].body[0])) == 1
+        assert len(FindNodes(HaloUpdateCall).visit(body0(op3).body[1].body[1])) == 3
         assert calls[0].arguments[0] is v
         assert calls[1].arguments[0] is tau
         assert calls[1].arguments[1] is tau2
@@ -3459,8 +3503,8 @@ class TestElasticLike:
                  if isinstance(i, HaloUpdateCall)]
 
         assert len(calls) == 3
-        assert len(FindNodes(HaloUpdateCall).visit(op0.body.body[1].body[1].body[0])) == 1
-        assert len(FindNodes(HaloUpdateCall).visit(op0.body.body[1].body[1].body[1])) == 2
+        assert len(FindNodes(HaloUpdateCall).visit(body0(op0).body[1].body[0])) == 1
+        assert len(FindNodes(HaloUpdateCall).visit(body0(op0).body[1].body[1])) == 2
         assert calls[0].arguments[0] is v
         assert calls[0].arguments[3].args[0] is t.symbolic_max
         assert calls[1].arguments[0] is tau
@@ -3487,7 +3531,7 @@ def get_time_loop(op):
     for i in iters:
         if i.dim.is_Time:
             return i
-    assert False
+    raise AssertionError('Assert False')
 
 
 if __name__ == "__main__":
