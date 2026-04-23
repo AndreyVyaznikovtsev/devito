@@ -10,7 +10,7 @@ from devito.builtins import initialize_function, gaussian_smooth, mmax, mmin
 from devito.tools import as_tuple
 
 __all__ = ['SeismicModel', 'Model', 'ModelElastic',
-           'ModelViscoelastic', 'ModelViscoacoustic', 'ModelSH']
+           'ModelViscoelastic', 'ModelViscoacoustic', 'ModelSH', 'ModelAcousticIVF']
 
 
 def initialize_damp(damp, padsizes, spacing, abc_type="damp", fs=False):
@@ -607,6 +607,180 @@ class ModelSH(GenericModel):
         if self._dt:
             return self._dt
         return dt
+
+    @property
+    def dt_scale(self):
+        return self._dt_scale
+
+    @dt_scale.setter
+    def dt_scale(self, val):
+        self._dt_scale = val
+
+
+class ModelAcousticIVF(GenericModel):
+    """
+    Physical model for first-order acoustic wave modelling with IVF free surface.
+
+    Velocity-pressure staggered-grid formulation (acoustic limit of Virieux 1986
+    P-SV equations with mu=0):
+
+        vx^{n+1/2} = vx^{n-1/2} - dt * b_x * dp/dx
+        vz^{n+1/2} = vz^{n-1/2} - dt * b_z * dp/dz
+        p^{n+1}    = p^n         - dt * kappa * (dvx/dx + dvz/dz)
+
+    Grid staggering:
+        p     -- NODE         (x,     z    )
+        vx    -- staggered x  (x+h/2, z    )
+        vz    -- staggered z  (x,     z+h/2)
+        kappa -- NODE         (zero in vacuum -> p stays 0; IVF)
+        b_x   -- staggered x  IVF-averaged buoyancy (Pan 2018 eq. 9)
+        b_z   -- staggered z  IVF-averaged buoyancy (Pan 2018 eq. 10)
+
+    The IVF free-surface condition (Pan et al. 2018) is applied automatically:
+    - kappa = rho * vp^2 is zero in vacuum cells, keeping dp/dt=0 and p=0 there.
+    - b_x and b_z use Pan eqs. 9-10, giving doubled buoyancy at solid/vacuum
+      interfaces and zero at vacuum/vacuum interfaces.
+    No modulus averaging is needed (mu=0 for acoustic).
+
+    It is the caller's responsibility to supply vp and rho arrays with zeros
+    above the topographic free surface to embed the vacuum region.
+
+    Units
+    -----
+    All physical parameters must use a consistent unit system.  The recommended
+    system (matching the rest of the Devito seismic examples) is:
+
+        distance : m     (grid spacing in metres)
+        velocity : km/s  (vp = 1.5, not 1500)
+        density  : g/cm³ (rho = 2.0, not 2000)
+        time     : ms    (implicit; critical_dt is returned in ms)
+
+    With these choices every parameter value is O(1) and kappa = rho * vp² ≈
+    O(1–10) g·km²/(cm³·s²), which is numerically well-conditioned.
+
+    Parameters
+    ----------
+    origin : tuple of floats
+        Origin of the model in m as (x, z).
+    spacing : tuple of floats
+        Grid spacing in m as (dx, dz).
+    shape : tuple of int
+        Number of grid points as (nx, nz).
+    space_order : int
+        Spatial discretisation order.
+    vp : array_like or float
+        P-wave velocity in km/s. Zero above the free surface (vacuum).
+    rho : array_like or float
+        Density in g/cm³. Zero above the free surface (vacuum).
+    nbl : int, optional
+        Number of absorbing boundary layers.
+    bcs : str, optional
+        Absorbing boundary type ("damp" or "mask").
+    dtype : data-type, optional
+        Defaults to np.float32.
+    topo : array_like of int, optional
+        1-D integer array (length shape[0]) giving the first solid z-index per
+        x column. Stored as metadata only; the caller pre-zeros vp and rho.
+    """
+
+    def __init__(self, origin, spacing, shape, space_order, vp, rho, nbl=20,
+                 dtype=np.float32, subdomains=(), bcs="mask", grid=None,
+                 topology=None, topo=None, **kwargs):
+        super().__init__(origin, spacing, shape, space_order, nbl, dtype,
+                         subdomains, topology=topology, grid=grid, bcs=bcs)
+
+        vp_arr  = self._to_array(vp,  self.shape, dtype)
+        rho_arr = self._to_array(rho, self.shape, dtype)
+
+        # Bulk modulus at NODE: zero in vacuum keeps dp/dt=0 there (IVF).
+        kappa_arr = (rho_arr * vp_arr**2).astype(dtype)
+
+        # IVF buoyancy at staggered positions (Pan 2018, eqs 9-10).
+        b_x_arr, b_z_arr = self._ivf_stagger(rho_arr)
+
+        x, z = self.grid.dimensions
+
+        self.kappa = self._gen_phys_param(kappa_arr, 'kappa', space_order,
+                                          is_param=True, staggered=NODE)
+        self.b_x   = self._gen_phys_param(b_x_arr, 'b_x', space_order,
+                                          is_param=True, staggered=(x,))
+        self.b_z   = self._gen_phys_param(b_z_arr, 'b_z', space_order,
+                                          is_param=True, staggered=(z,))
+
+        # vp kept for CFL; not passed to the operator.
+        self.vp = self._gen_phys_param(vp_arr, 'vp', space_order,
+                                        is_param=True, staggered=NODE)
+        self._physical_parameters.discard('vp')
+
+        self.topo = np.asarray(topo, dtype=int) if topo is not None else None
+        self._dt = kwargs.get('dt')
+        self._dt_scale = 1
+
+    @staticmethod
+    def _to_array(field, shape, dtype):
+        if isinstance(field, np.ndarray):
+            return field.astype(dtype, copy=True)
+        return np.full(shape, field, dtype=dtype)
+
+    @staticmethod
+    def _ivf_b(rho_a, rho_b):
+        """
+        IVF buoyancy between two cells: 2/(rho_a + rho_b).
+        Zero when both densities are zero (vacuum/vacuum interface).
+        When one side is vacuum (rho=0): b = 2/rho_solid (doubled buoyancy).
+        """
+        result = np.zeros_like(rho_a)
+        denom = rho_a + rho_b
+        mask = denom != 0
+        result[mask] = 2.0 / denom[mask]
+        return result
+
+    @staticmethod
+    def _safe_inv(rho):
+        """1/rho; zero where rho=0."""
+        result = np.zeros_like(rho)
+        mask = rho != 0
+        result[mask] = 1.0 / rho[mask]
+        return result
+
+    def _ivf_stagger(self, rho_arr):
+        """
+        Compute IVF-averaged buoyancy at staggered positions.
+
+        b_x[i,k] = 2/(rho[i,k] + rho[i+1,k])   at (x+h/2, z)   -- Pan eq. 9
+        b_z[i,k] = 2/(rho[i,k] + rho[i,k+1])   at (x, z+h/2)   -- Pan eq. 10
+
+        Neumann (copy) condition at the right/bottom physical edge ensures that
+        initialize_function's constant-extension padding fills the PML with
+        valid buoyancy values so absorbing boundaries work correctly.
+        """
+        b_x = np.zeros_like(rho_arr)
+        b_x[:-1, :] = self._ivf_b(rho_arr[:-1, :], rho_arr[1:, :])
+        b_x[-1, :]  = self._safe_inv(rho_arr[-1, :])
+
+        b_z = np.zeros_like(rho_arr)
+        b_z[:, :-1] = self._ivf_b(rho_arr[:, :-1], rho_arr[:, 1:])
+        b_z[:, -1]  = self._safe_inv(rho_arr[:, -1])
+
+        return b_x, b_z
+
+    @property
+    def _max_vp(self):
+        return float(mmax(self.vp))
+
+    @property
+    def _cfl_coeff(self):
+        """CFL coefficient for the staggered first-order velocity-pressure scheme."""
+        coeffs = fd_w(1, range(-self.space_order//2 + 1, self.space_order//2 + 1), .5)
+        c_fd = sum(np.abs(coeffs[-1][-1])) / 2
+        return .95 * np.sqrt(self.dim) / self.dim / c_fd
+
+    @property
+    def critical_dt(self):
+        """Critical time step from the CFL condition."""
+        dt = self._cfl_coeff * np.min(self.spacing) / self._max_vp
+        dt = self.dtype("%.3e" % (self._dt_scale * dt))
+        return self._dt if self._dt else dt
 
     @property
     def dt_scale(self):
