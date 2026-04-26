@@ -55,32 +55,87 @@ Line length is 90. The ruff config is in `pyproject.toml`.
 
 Physics solvers live here, structured as `model.py` + per-physics directory:
 
-- **`model.py`** — `GenericModel` base class + `SeismicModel` (acoustic/elastic/VTI/TTI) + `ModelSH`. All models create a `Grid` with PML padding (`nbl` layers), initialize a `damp` (or `mask`) field for absorbing boundaries, and store physical parameters as Devito `Function` objects.
+- **`model.py`** — `GenericModel` base class + `SeismicModel` (acoustic/elastic/VTI/TTI). All models create a `Grid` with PML padding (`nbl` layers), initialize a `damp` field for absorbing boundaries, and store physical parameters as Devito `Function` objects.
 - **`source.py`** — `RickerSource`, `AcquisitionGeometry`, receiver utilities.
-- **`acoustic/`**, **`elastic/`**, **`tti/`**, **`vti/`**, **`sh/`**, … — Each contains `operators.py` (builds `Operator` from symbolic stencil equations) and `wavesolver.py` (thin wrapper with `forward()`/`adjoint()` methods and operator caching via `@memoized_meth`).
+- **`acoustic/`**, **`elastic/`**, **`tti/`**, **`vti/`**, **`acoustic_topo/`**, … — Each contains `operators.py` (builds `Operator` from symbolic stencil equations) and `wavesolver.py` (thin wrapper with `forward()`/`adjoint()` methods and operator caching via `@memoized_meth`).
 
-### SH wave solver (`examples/seismic/sh/`)
+### Acoustic topography solver (`examples/seismic/acoustic_topo/`)
 
-Velocity-stress staggered-grid formulation (Virieux 1984):
+Variable-density acoustic FDTD modeling with irregular free surface topography.
+Method: Immersed Boundary Method (IBM) with iterative symmetric interpolation
+(Li et al. 2020, J. Geophys. Eng. 17, 643–660).
+
+**Governing equation — 2nd order, non-staggered, variable density:**
 
 ```
-v^{n+1/2}    = v^{n-1/2}  + dt * b  * (d/dx tau_xy + d/dz tau_zy)
-tau_xy^{n+1} = tau_xy^{n} + dt * mu * d/dx v^{n+1/2}
-tau_zy^{n+1} = tau_zy^{n} + dt * mu * d/dz v^{n+1/2}
+(1/v²) ∂²p/∂t² = ρ ∇·(1/ρ ∇p) + src
+               = (b·∂p/∂x)_x + (b·∂p/∂z)_z + src
 ```
 
-Grid staggering:
-- `v`, `b` — at `NODE` (integer grid points)
-- `tau_xy` — staggered in x (`staggered=(x,)`)
-- `tau_zy` — staggered in z (`staggered=(z,)`)
-- `mu` — at `NODE`; Devito harmonic-averages it to half-point positions automatically
+where `b = 1/ρ` is buoyancy. Both `v(x,z)` and `ρ(x,z)` vary spatially.
+Single pressure field `p` — no staggering, no velocity components.
 
-`ModelSH` inherits `GenericModel` (not `SeismicModel`). Its `critical_dt` uses the elastic CFL coefficient. Boundary damping uses `bcs="mask"` (multiplied onto the update, so `damp=1` inside domain).
+In Devito symbolic form:
 
-Working example notebooks:
-- `examples/seismic/tutorials/18_sh_constant.ipynb` — homogeneous medium
-- `examples/seismic/tutorials/18_sh_varying.ipynb` — heterogeneous medium
-- `examples/seismic/tutorials/18_sh_snaps.ipynb` — wavefield snapshots
+```python
+# m = 1/v² (slowness squared), b = 1/rho (buoyancy) — both Function objects
+pde = m * p.dt2 - (b * p.dx).dx - (b * p.dz).dz
+stencil = Eq(p.forward, solve(pde, p.forward))
+```
+
+**Why 2nd order non-staggered (not 1st order staggered):** IBM requires antisymmetric
+ghost-point mirroring on a single scalar field (`p = 0` at the surface). A staggered
+velocity-pressure system would need ghost conditions on three fields (`p`, `vx`, `vz`)
+at different half-integer grid positions, with no clean antisymmetric BC for the velocity
+components. The 2nd order pressure formulation keeps IBM straightforward.
+
+**IBM free surface — setup (done once before the time loop):**
+
+1. Number of ghost layers = `space_order // 2` (half the FD stencil length).
+2. Identify all ghost points: integer grid points above the surface.
+3. For each ghost point, find its intercept point — the closest point on the
+   surface boundary (nearest-point search on a dense surface sample).
+4. Mirror point = reflection of ghost point through the intercept (lands on a
+   fractional grid position below the surface).
+5. Compute Lagrange interpolation coefficients mapping surrounding integer-grid
+   values to each mirror point. Store as precomputed arrays (done once, O(N_ghost)).
+6. Copy model parameters (`b`, `m`) at ghost points from their mirror points.
+
+**IBM free surface — per time step (interleaved with the FD update):**
+
+1. Run the standard FD pressure update (covers the full grid including ghost points).
+2. Zero out ghost point values.
+3. Iterate up to 20 times (typically converges in ~5):
+   a. Interpolate `p` at each mirror point using precomputed Lagrange coefficients
+      applied to surrounding integer-grid values (ghost points participate as
+      neighbours — this is what makes the interpolation "symmetric").
+   b. Set `p_ghost = −p_mirror` (antisymmetric enforcement of `p = 0`).
+4. After convergence the ghost wavefield is consistent and the next FD step proceeds.
+
+The inner iteration is a Python loop calling a small Devito `Operator` each pass,
+not a symbolic inner loop. Convergence is fast so overhead is small.
+
+**Absorbing boundaries:** Standard `damp` sponge (`bcs="damp"`) at the bottom and
+lateral edges via `SeismicModel`. The IBM ghost region (top) and the sponge (other
+three sides) are geometrically disjoint and do not interact.
+
+**Key constraints and failure modes:**
+- Stable for surface dip angles up to ~73°. Very steep slopes cause multiple ghost
+  points in one cell to share mirror points — leads to instability.
+- Topography must not reach the lateral/bottom sponge layers.
+- Use Lagrange interpolation (not bilinear — produces high-frequency artifacts;
+  not extrapolation — unstable).
+- Ghost point model parameters (`b`, `m`) must be set to mirror-point values
+  before the time loop and do not need updating each step (model is static).
+
+**File structure:**
+- `model.py` — `ModelTopo`: inherits `GenericModel`; accepts velocity and density
+  arrays plus a topography array `z0(x)`; builds `Grid`, `damp` sponge, `b`/`m`
+  `Function` objects, and precomputes ghost/mirror/interpolation data structures.
+- `operators.py` — `IBMOperator` (ghost correction step) + `ForwardOperator`
+  (composes FD pressure update with IBM correction).
+- `wavesolver.py` — `AcousticTopoSolver` with `forward()` and `@memoized_meth`
+  operator caching.
 
 ### Key patterns
 
