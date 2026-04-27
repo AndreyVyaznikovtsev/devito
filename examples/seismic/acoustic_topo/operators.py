@@ -88,10 +88,14 @@ def ForwardOperator(model, geometry, space_order=4, save=False, **kwargs):
 
     m, b, damp = model.m, model.b, model.damp
     s = model.grid.stepping_dim.spacing
+    x, y = model.grid.dimensions
 
-    # Variable-density acoustic PDE residual.
-    # In Devito 2-D: spatial dimensions are (x, y); the "depth" axis is y.
-    pde = m * p.dt2 - (b * p.dx).dx - (b * p.dy).dy
+    # Variable-density acoustic PDE:  m ∂²p/∂t² = ∇·(b ∇p) + src
+    # Staggered 1st-derivative operators give the compact (non-wide) stencil
+    # for the divergence term, avoiding the checkerboard null-space that arises
+    # from composing two centered 1st derivatives on the same grid.
+    pde = m * p.dt2 - (b * p.dx(x0=x + x.spacing/2)).dx(x0=x - x.spacing/2) \
+                    - (b * p.dy(x0=y + y.spacing/2)).dy(x0=y - y.spacing/2)
     stencil = Eq(p.forward, damp * solve(pde, p.forward))
 
     src = geometry.src
