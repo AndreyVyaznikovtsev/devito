@@ -15,9 +15,14 @@ this [x, z] / [ix, iz] order.
 
 import numpy as np
 
-__all__ = ['setup_ibm', 'find_ghost_points', 'find_intercept_points',
-           'find_mirror_points', 'lagrange_coefficients',
-           'copy_model_params_to_ghosts']
+__all__ = [
+    'copy_model_params_to_ghosts',
+    'find_ghost_points',
+    'find_intercept_points',
+    'find_mirror_points',
+    'lagrange_coefficients',
+    'setup_ibm',
+]
 
 
 def find_ghost_points(is_ghost):
