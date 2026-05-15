@@ -1,0 +1,8 @@
+SOCHI_PATH = "/mnt/Ngen_3/2026.02 - (183) Сочи/040 - Обработка/FWI"
+ZOND_RES = SOCHI_PATH + "/zond_calculated_data.ST"
+GRID = SOCHI_PATH + "/tomo_p_res.grd"
+DATA_0 = SOCHI_PATH + "/data_unprocessed.sgy"
+DATA_1 = SOCHI_PATH + "/data_f1.sgy"
+DATA_2 = SOCHI_PATH + "/data_f2.sgy"
+DATA_3 = SOCHI_PATH + "/data_f3.sgy"
+WAVELETS = SOCHI_PATH + "/wavelets.sgy"
